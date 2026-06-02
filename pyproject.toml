@@ -1,0 +1,88 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ml-tools"
+version = "0.1.0"
+description = "Набор инструментов для быстрой разработки ML-решений"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["machine-learning", "pytorch", "visualization", "logging", "inference"]
+
+# Базовые зависимости, нужные почти всегда
+dependencies = [
+    "numpy>=1.21,<2.0",  # Ограничил <2.0 из-за совместимости многих ML библиотек
+    "torch>=2.0",
+    "tqdm",
+    "pydantic",          # Для удобной конфигурации через dataclasses/models
+]
+
+# Опциональные зависимости по модулям
+[project.optional-dependencies]
+# Для модуля logging/
+logging = [
+    "mlflow>=2.8",
+    "boto3",             # Для S3/MinIO интеграции
+]
+
+# Для модуля visualization/
+viz = [
+    "matplotlib",
+    "opencv-python-headless", # headless версия лучше для серверов/Docker
+    "pillow",
+]
+
+# Для модуля ml/ (если там есть специфичные вещи, кроме torch)
+# Например, если используете timm или segmentation-models-pytorch
+ml-extra = [
+    "timm",
+    "segmentation-models-pytorch",
+]
+
+# Для работы с данными (CVAT, LAS, XML)
+data = [
+    "pandas",
+    "lasio",             # Для .las файлов
+    "xmltodict",         # Для XML
+    "albumentations",    # Часто нужно для аугментаций в ML
+]
+
+# Полный набор зависимостей
+all = [
+    "ml-tools[logging,viz,ml-extra,data]"
+]
+
+# Настройки для разработчиков
+[project.urls]
+Homepage = "https://github.com/yourusername/ml-tools"
+Repository = "https://github.com/yourusername/ml-tools"
+
+[tool.hatch.build.targets.wheel]
+# Указываем, где лежит пакет.
+# Так как у вас структура tools/, а не src/ml_tools/, указываем явно.
+packages = ["tools"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+select = ["E", "F", "I", "N", "W", "B", "C4", "UP"]
+ignore = []
+
+[tool.ruff.isort]
+known-first-party = ["tools"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false # Можно включить true, когда покроете типами весь код
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
