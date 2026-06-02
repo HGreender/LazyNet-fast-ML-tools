@@ -1,9 +1,8 @@
-import json
-
 import numpy as np
 import matplotlib.pyplot as plt
 
 from tools.models import EpochsData
+from tools.logging import EpochsLogger
 
 
 def plot_epochs_data(
@@ -12,21 +11,16 @@ def plot_epochs_data(
 ):
     """Визуализация графиков обучения из JSON"""
     if epoch_data is None:
-        try:
-            with open(logs_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except FileNotFoundError:
-            print("Файл логов не найден. Пропуск визуализации.")
+        epoch_logger = EpochsLogger()
+        if not epoch_logger.load_logs_json(logs_path):
+            print("Не удалось загрузить логи для визуализации")
             return
 
-        logs = data.get('logs', {})
-        epochs = logs.get('epochs', [])
-        train_losses = logs.get('train_losses', [])
-        val_losses = logs.get('val_losses', [])
-    else:
-        epochs = epoch_data.epochs
-        train_losses = epoch_data.train_losses
-        val_losses = epoch_data.val_losses
+        epoch_data = epoch_logger.epoch_logs
+
+    epochs = epoch_data.epochs
+    train_losses = epoch_data.train_losses
+    val_losses = epoch_data.val_losses
 
     if not epochs:
         print("Нет данных для построения графика")
