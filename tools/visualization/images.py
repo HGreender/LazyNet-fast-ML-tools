@@ -1,13 +1,61 @@
+import os
+
 import cv2
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-
+from tqdm import tqdm
 
 from tools.ml.augmentations import get_imagenet_encoder_augmentation
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
+
+
+def show_segmentation(image_rgb, binary_mask, save_path=None):
+    """
+    Универсальная функция визуализации сегментации.
+
+    Args:
+        image_rgb (np.array): Оригинальное изображение в RGB.
+        binary_mask (np.array): Бинарная маска предсказания.
+        save_path (str, optional): Путь для сохранения изображения.
+    """
+    plt.figure(figsize=(18, 6))
+
+    # 1. Original
+    plt.subplot(1, 3, 1)
+    plt.title("Original")
+    plt.imshow(image_rgb)
+    plt.axis('off')
+
+    # 2. Mask
+    plt.subplot(1, 3, 2)
+    plt.title("Predicted Mask")
+    plt.imshow(binary_mask, cmap='gray')
+    plt.axis('off')
+
+    # 3. Overlay
+    plt.subplot(1, 3, 3)
+    plt.title("Overlay")
+
+    # Создаем цветную маску (красный канал)
+    color_mask = np.zeros_like(image_rgb)
+    color_mask[binary_mask == 1] = [255, 0, 0]
+
+    # Накладываем с прозрачностью
+    overlay = cv2.addWeighted(image_rgb, 1.0, color_mask, 0.2, 0)
+    plt.imshow(overlay)
+    plt.axis('off')
+
+    plt.tight_layout()
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path)
+        print(f"🖼️ Visualization saved to {save_path}")
+
+    plt.show()
 
 
 def show_n_augmentations(image_path, mask_path, n_samples=3, size = (512, 512)):
