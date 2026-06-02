@@ -4,7 +4,6 @@ import cv2
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 
 from tools.ml.augmentations import get_imagenet_encoder_augmentation
 
