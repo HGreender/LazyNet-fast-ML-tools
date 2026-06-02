@@ -31,10 +31,10 @@ class EpochsLogger:
             json.dump(logs_data, f, indent=2, ensure_ascii=False)
 
     def add_and_save_logs(
-            self, epoch,
-            train_loss, val_loss, best_loss,
+            self,
+            epoch, train_loss, val_loss, best_loss,
             path='./logs/training_logs.json'
     ):
         """Сохранение логов обучения в JSON"""
-        self.add_logs(epoch, train_loss, val_loss)
+        self.add_logs(epoch, train_loss, val_loss, best_loss)
         self.save_logs(path)
