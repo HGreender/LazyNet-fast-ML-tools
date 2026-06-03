@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ml-tools"
+name = "fast-ml-tools"
 version = "0.1.0"
 description = "Набор инструментов для быстрой разработки ML-решений"
 readme = "README.md"
@@ -12,76 +12,84 @@ requires-python = ">=3.9"
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
-keywords = ["machine-learning", "pytorch", "visualization", "logging", "inference"]
 
-# Базовые зависимости, нужные почти всегда
+# Базовые зависимости
+# Мы ослабляем требования, чтобы pip мог разрешить конфликты (особенно numpy)
 dependencies = [
-    "numpy>=1.21,<2.0",  # Ограничил <2.0 из-за совместимости многих ML библиотек
-    "torch>=2.0",
-    "tqdm",
-    "pydantic",          # Для удобной конфигурации через dataclasses/models
+    "numpy>=1.26.4",  # Минимальная версия, которую вы использовали. Pip поставит 2.x, если нужно другим пакетам
+    "torch>=2.5.0",   # Исправлено на реальную существующую версию. Если нужна именно 2.11 (nightly), нужен спец. индекс
+    "torchvision>=0.20.0",
+    "tqdm>=4.67.0",
+    "pydantic>=2.10.0",
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
-# Опциональные зависимости по модулям
 [project.optional-dependencies]
-# Для модуля logging/
+# 1. Логирование
 logging = [
-    "mlflow>=2.8",
-    "boto3",             # Для S3/MinIO интеграции
+    "mlflow>=3.0.0",
+    "boto3>=1.35.0",
+    "sqlalchemy>=2.0.0",
 ]
 
-# Для модуля visualization/
+# 2. Визуализация
 viz = [
-    "matplotlib",
-    "opencv-python-headless", # headless версия лучше для серверов/Docker
-    "pillow",
+    "matplotlib>=3.9.0",
+    # Важно: opencv-python>=4.10 требует numpy>=2.
+    # Если вам критичен numpy<2, нужно использовать opencv-python<4.10
+    "opencv-python>=4.10.0",
+    "opencv-python-headless>=4.10.0",
+    "pillow>=10.0.0",
 ]
 
-# Для модуля ml/ (если там есть специфичные вещи, кроме torch)
-# Например, если используете timm или segmentation-models-pytorch
+# 3. ML модели и аугментации
 ml-extra = [
-    "timm",
-    "segmentation-models-pytorch",
+    "timm>=1.0.0",
+    "segmentation-models-pytorch>=0.4.0",
+    "albumentations>=2.0.0", # Требует numpy>=2
+    "monai>=1.4.0",
+    "pytorch-lightning>=2.4.0",
+    "huggingface-hub>=0.25.0",
+    "safetensors>=0.4.0",
+    "scikit-learn>=1.5.0",
+    "scipy>=1.14.0",
 ]
 
-# Для работы с данными (CVAT, LAS, XML)
+# 4. Работа с данными
 data = [
-    "pandas",
-    "lasio",             # Для .las файлов
-    "xmltodict",         # Для XML
-    "albumentations",    # Часто нужно для аугментаций в ML
+    "pandas>=2.2.0",
+    "polars>=1.0.0",
+    "lasio>=0.30",
+    "xmltodict>=0.13.0",
+    "openpyxl>=3.1.0",
+    "pyarrow>=17.0.0",
 ]
 
-# Полный набор зависимостей
+# 5. API и утилиты
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "httpx>=0.27.0",
+    "rich>=13.0.0",
+    "typer>=0.12.0",
+]
+
+# Полный набор
 all = [
-    "ml-tools[logging,viz,ml-extra,data]"
+    "fast-ml-tools[logging,viz,ml-extra,data,api]"
 ]
-
-# Настройки для разработчиков
-[project.urls]
-Homepage = "https://github.com/yourusername/ml-tools"
-Repository = "https://github.com/yourusername/ml-tools"
 
 [tool.hatch.build.targets.wheel]
-# Указываем, где лежит пакет.
-# Так как у вас структура tools/, а не src/ml_tools/, указываем явно.
 packages = ["tools"]
 
 [tool.ruff]
 line-length = 88
 target-version = "py39"
-select = ["E", "F", "I", "N", "W", "B", "C4", "UP"]
-ignore = []
-
-[tool.ruff.isort]
-known-first-party = ["tools"]
 
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false # Можно включить true, когда покроете типами весь код
-disallow_incomplete_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
