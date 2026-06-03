@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [tool.hatch.version]
-path = "tools/_version.py"
+path = "fast_ml_tools/_version.py"
 
 [project.optional-dependencies]
 # 1. Логирование
