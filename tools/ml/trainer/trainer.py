@@ -67,11 +67,11 @@ class Trainer:
         """Сохранение лучшей модели"""
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save(self.model.state_dict(), path)
-        print(f"💾 Saved best model to {path}")
+        print(f"Saved best model to {path}")
 
     def fit(self, epochs, save_path='./models/best_model.pth', log_path='./logs/training_logs.json'):
         """Основной цикл тренировки"""
-        print(f"🚀 Start training on {self.device} for {epochs} epochs")
+        print(f"Start training on {self.device} for {epochs} epochs")
 
         for epoch in range(epochs):
             self.current_epoch = epoch
@@ -100,7 +100,7 @@ class Trainer:
                 path=log_path
             )
 
-        print(f"✅ Training finished. Best Val Loss: {self.best_loss:.4f}")
+        print(f"Training finished. Best Val Loss: {self.best_loss:.4f}")
         return self.logger.epoch_logs
 
     def load_logs_and_continue(self, log_path='./logs/training_logs.json'):

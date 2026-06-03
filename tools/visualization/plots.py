@@ -39,5 +39,5 @@ def plot_epochs_data(
     plt.show()
 
     best_idx = np.argmin(val_losses)
-    print(f"✅ Лучший epoch: {epochs[best_idx]}")
-    print(f"📉 Минимальный val_loss: {val_losses[best_idx]:.4f}")
+    print(f"Лучший epoch: {epochs[best_idx]}")
+    print(f"Минимальный val_loss: {val_losses[best_idx]:.4f}")
