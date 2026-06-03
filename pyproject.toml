@@ -1,0 +1,99 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fast-ml-tools"
+dynamic = ["version"]
+description = "Набор инструментов для быстрой разработки ML-решений"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+
+# Базовые зависимости
+# Мы ослабляем требования, чтобы pip мог разрешить конфликты (особенно numpy)
+dependencies = [
+    "numpy>=1.26.4",  # Минимальная версия, которую вы использовали. Pip поставит 2.x, если нужно другим пакетам
+    "torch>=2.5.0",   # Исправлено на реальную существующую версию. Если нужна именно 2.11 (nightly), нужен спец. индекс
+    "torchvision>=0.20.0",
+    "tqdm>=4.67.0",
+    "pydantic>=2.10.0",
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.hatch.version]
+path = "fast_ml_tools/_version.py"
+
+[project.optional-dependencies]
+# 1. Логирование
+logging = [
+    "mlflow>=3.0.0",
+    "boto3>=1.35.0",
+    "sqlalchemy>=2.0.0",
+]
+
+# 2. Визуализация
+viz = [
+    "matplotlib>=3.9.0",
+    # Важно: opencv-python>=4.10 требует numpy>=2.
+    # Если вам критичен numpy<2, нужно использовать opencv-python<4.10
+    "opencv-python>=4.10.0",
+    "opencv-python-headless>=4.10.0",
+    "pillow>=10.0.0",
+]
+
+# 3. ML модели и аугментации
+ml-extra = [
+    "timm>=1.0.0",
+    "segmentation-models-pytorch>=0.4.0",
+    "albumentations>=2.0.0", # Требует numpy>=2
+    "monai>=1.4.0",
+    "pytorch-lightning>=2.4.0",
+    "huggingface-hub>=0.25.0",
+    "safetensors>=0.4.0",
+    "scikit-learn>=1.5.0",
+    "scipy>=1.14.0",
+]
+
+# 4. Работа с данными
+data = [
+    "pandas>=2.2.0",
+    "polars>=1.0.0",
+    "lasio>=0.30",
+    "xmltodict>=0.13.0",
+    "openpyxl>=3.1.0",
+    "pyarrow>=17.0.0",
+]
+
+# 5. API и утилиты
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "httpx>=0.27.0",
+    "rich>=13.0.0",
+    "typer>=0.12.0",
+]
+
+# Полный набор
+all = [
+    "fast-ml-tools[logging,viz,ml-extra,data,api]"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["fast_ml_tools"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
