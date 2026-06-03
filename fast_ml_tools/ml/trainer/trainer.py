@@ -3,7 +3,7 @@ import os
 import cv2
 import torch
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from fast_ml_tools.logging import EpochsLogger
 from fast_ml_tools.visualization import show_segmentation
@@ -34,7 +34,9 @@ class Trainer:
             self.train_loader,
             desc=f"Epoch {self.current_epoch + 1} [Train]",
             leave=False,
-            colour='blue'
+            colour='blue',
+            mininterval=0.5,
+            ncols=80
         )
         for images, masks in pbar:
             images = images.to(self.device)
@@ -58,7 +60,14 @@ class Trainer:
         running_loss = 0.0
 
         with torch.no_grad():
-            pbar = tqdm(self.val_loader, desc="Validating", leave=False)
+            pbar = tqdm(
+                self.val_loader,
+                desc="Validating",
+                leave=False,
+                colour='green',
+                mininterval=0.5,
+                ncols=80
+            )
             for images, masks in pbar:
                 images = images.to(self.device)
                 masks = masks.to(self.device)
@@ -79,7 +88,13 @@ class Trainer:
         """Основной цикл тренировки"""
         print(f"Start training on {self.device} for {epochs} epochs")
 
-        epoch_pbar = tqdm(range(epochs), desc="Total Progress", colour='magenta')
+        epoch_pbar = tqdm(
+            range(epochs),
+            desc="Total Progress",
+            colour='magenta',
+            mininterval=1,  # Обновлять реже, так как эпохи долгие
+            ncols=80
+        )
         for epoch in epoch_pbar:
             self.current_epoch = epoch
 
