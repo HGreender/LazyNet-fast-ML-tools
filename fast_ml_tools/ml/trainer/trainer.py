@@ -30,7 +30,12 @@ class Trainer:
         self.model.train()
         running_loss = 0.0
 
-        pbar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1} [Train]")
+        pbar = tqdm(
+            self.train_loader,
+            desc=f"Epoch {self.current_epoch + 1} [Train]",
+            leave=False,
+            colour='blue'
+        )
         for images, masks in pbar:
             images = images.to(self.device)
             masks = masks.to(self.device)
@@ -53,7 +58,8 @@ class Trainer:
         running_loss = 0.0
 
         with torch.no_grad():
-            for images, masks in tqdm(self.val_loader, desc="Validating", leave=False):
+            pbar = tqdm(self.val_loader, desc="Validating", leave=False)
+            for images, masks in pbar:
                 images = images.to(self.device)
                 masks = masks.to(self.device)
 
@@ -73,7 +79,8 @@ class Trainer:
         """Основной цикл тренировки"""
         print(f"Start training on {self.device} for {epochs} epochs")
 
-        for epoch in range(epochs):
+        epoch_pbar = tqdm(range(epochs), desc="Total Progress", colour='magenta')
+        for epoch in epoch_pbar:
             self.current_epoch = epoch
 
             # Обучение и валидация
