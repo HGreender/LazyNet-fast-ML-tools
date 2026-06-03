@@ -89,7 +89,7 @@ class LazyNet:
 
         self.train_logs = None
 
-    def train(
+    def fit(
             self,
             save_model_path: str = './models/best_model.pth',
             save_logs_path: str = './logs/training_logs.json',
