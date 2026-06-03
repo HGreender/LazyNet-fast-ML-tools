@@ -81,7 +81,7 @@ all = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["fmt"]
+packages = ["fast_ml_tools"]
 
 [tool.ruff]
 line-length = 88

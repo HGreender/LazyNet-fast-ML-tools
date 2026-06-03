@@ -1,7 +1,7 @@
 import json
 import os
 
-from tools.models import EpochsData
+from fast_ml_tools.models import EpochsData
 
 class EpochsLogger:
     def __init__(self):

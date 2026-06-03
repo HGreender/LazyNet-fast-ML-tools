@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.models import EpochsData
-from tools.logging import EpochsLogger
+from fast_ml_tools.models import EpochsData
+from fast_ml_tools.logging import EpochsLogger
 
 
 def plot_epochs_data(

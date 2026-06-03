@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.ml.augmentations import get_imagenet_encoder_augmentation
+from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]

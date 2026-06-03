@@ -5,8 +5,8 @@ import torch
 import numpy as np
 from tqdm import tqdm
 
-from tools.logging import EpochsLogger
-from tools.visualization import show_segmentation
+from fast_ml_tools.logging import EpochsLogger
+from fast_ml_tools.visualization import show_segmentation
 
 class Trainer:
     def __init__(self, model, train_loader, val_loader, optimizer, loss_fn, scheduler=None, device='cuda'):
