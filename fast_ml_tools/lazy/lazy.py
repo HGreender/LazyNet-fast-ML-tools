@@ -36,10 +36,11 @@ class LazyNet:
             train_img_dir: str, train_mask_dir: str,
             val_img_dir: str, val_mask_dir: str,
             epochs: int = 100, batch_size: int = 1, lr: float = 1e-4, patience: int = 5,
-            device_id: int = 0, num_workers: int = 0,
+            verbose: bool = True, device_id: int = 0, num_workers: int = 0,
             classes: list = ['target_class']
     ):
         self.device = _get_device(device_id)
+        self.verbose = verbose
 
         if model_name not in MODEL_FACTORIES:
             raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {list(MODEL_FACTORIES.keys())}")
@@ -84,7 +85,8 @@ class LazyNet:
             self.optimizer,
             self.loss_fn,
             self.scheduler,
-            self.device
+            self.device,
+            self.verbose
         )
 
         self.train_logs = None

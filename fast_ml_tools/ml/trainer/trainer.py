@@ -9,7 +9,12 @@ from fast_ml_tools.logging import EpochsLogger
 from fast_ml_tools.visualization import show_segmentation
 
 class Trainer:
-    def __init__(self, model, train_loader, val_loader, optimizer, loss_fn, scheduler=None, device='cuda'):
+    def __init__(
+            self,
+            model, train_loader, val_loader,
+            optimizer, loss_fn, scheduler=None,
+            device='cuda', verbose=True
+    ):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -17,11 +22,10 @@ class Trainer:
         self.loss_fn = loss_fn
         self.scheduler = scheduler
         self.device = device
+        self.verbose = verbose
 
-        # Логгер для отслеживания метрик
         self.logger = EpochsLogger()
 
-        # Состояние тренировки
         self.best_loss = float('inf')
         self.current_epoch = 0
 
@@ -30,7 +34,10 @@ class Trainer:
         self.model.train()
         running_loss = 0.0
 
-        pbar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1} [Train]")
+        if self.verbose:
+            pbar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1} [Train]")
+        else:
+            pbar = self.train_loader
         for images, masks in pbar:
             images = images.to(self.device)
             masks = masks.to(self.device)
@@ -43,7 +50,8 @@ class Trainer:
             self.optimizer.step()
 
             running_loss += loss.item() * images.size(0)
-            pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+            if self.verbose:
+                pbar.set_postfix({'loss': f'{loss.item():.4f}'})
 
         return running_loss / len(self.train_loader.dataset)
 
@@ -53,7 +61,10 @@ class Trainer:
         running_loss = 0.0
 
         with torch.no_grad():
-            pbar = tqdm(self.val_loader, desc="Validating", leave=False)
+            if self.verbose:
+                pbar = tqdm(self.val_loader, desc="Validating", leave=False)
+            else:
+                pbar = self.val_loader
             for images, masks in pbar:
                 images = images.to(self.device)
                 masks = masks.to(self.device)
