@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fast-ml-tools"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Набор инструментов для быстрой разработки ML-решений"
 readme = "README.md"
 license = {text = "MIT"}
@@ -24,6 +24,9 @@ dependencies = [
     "pyyaml>=6.0.0",
     "python-dotenv>=1.0.0",
 ]
+
+[tool.hatch.version]
+path = "tools/_version.py"
 
 [project.optional-dependencies]
 # 1. Логирование
