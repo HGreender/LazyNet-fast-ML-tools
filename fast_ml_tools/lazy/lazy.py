@@ -53,8 +53,8 @@ class LazyNet:
 
         if val_img_dir is None or val_mask_dir is None:
             self.train_dataset, self.val_dataset = create_train_val_datasets(
-                img_dir="/path/to/images",
-                mask_dir="/path/to/masks",
+                img_dir=train_img_dir,
+                mask_dir=train_mask_dir,
                 train_ratio=0.8,
                 val_ratio=0.2,
                 seed=42

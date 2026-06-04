@@ -57,7 +57,13 @@ class ImageMaskDataset(Dataset):
 
         # Преобразование в Tensor
         if isinstance(image, np.ndarray):
-            image = torch.from_numpy(image).permute(2, 0, 1)  # HWC -> CHW
+            # HWC -> CHW и нормализация к [0, 1]
+            image = image.astype(np.float32) / 255.0
+            image = torch.from_numpy(image).permute(2, 0, 1)
+        elif isinstance(image, torch.Tensor):
+            # Если аугментация вернула tensor, убедимся что он float
+            if image.dtype == torch.uint8:
+                image = image.float() / 255.0
 
         if isinstance(mask, np.ndarray):
             mask = torch.from_numpy(mask)
@@ -142,12 +148,3 @@ def create_train_val_datasets(
     )
 
     return train_dataset, val_dataset
-
-# # Пример
-# train_dataset, val_dataset = create_train_val_datasets(
-#     img_dir="/path/to/images",
-#     mask_dir="/path/to/masks",
-#     train_ratio=0.8,
-#     val_ratio=0.2,
-#     seed=42
-# )
