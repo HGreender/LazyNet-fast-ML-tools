@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from fast_ml_tools.ml.models import efficientnetb4_unet, efficientnetb4_unetpp
 from fast_ml_tools.ml.trainer import Trainer
 from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
-from fast_ml_tools.ml.datasets import DirsDataset
+from fast_ml_tools.ml.datasets import DirsDataset, create_train_val_datasets
 from fast_ml_tools.ml.losses import DiceBCELoss
 from fast_ml_tools.visualization import plot_epochs_data
 
@@ -34,7 +34,7 @@ class LazyNet:
             self,
             model_name: str,
             train_img_dir: str, train_mask_dir: str,
-            val_img_dir: str, val_mask_dir: str,
+            val_img_dir: str = None, val_mask_dir: str = None,
             epochs: int = 100, batch_size: int = 1, lr: float = 1e-4, patience: int = 5,
             verbose: bool = True, device_id: int = 0, num_workers: int = 0,
             classes: list = ['target_class']
@@ -51,7 +51,18 @@ class LazyNet:
         self.train_augmentation = get_imagenet_encoder_augmentation()
         self.val_augmentation = get_imagenet_encoder_augmentation()
 
-        self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
+        if val_img_dir is None or val_mask_dir is None:
+            self.train_dataset, self.val_dataset = create_train_val_datasets(
+                img_dir="/path/to/images",
+                mask_dir="/path/to/masks",
+                train_ratio=0.8,
+                val_ratio=0.2,
+                seed=42
+            )
+        else:
+            self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
+            self.val_dataset = DirsDataset(val_img_dir, val_mask_dir, augmentation=self.val_augmentation)
+
         self.train_loader = DataLoader(
             self.train_dataset,
             batch_size=batch_size,
@@ -59,8 +70,6 @@ class LazyNet:
             num_workers=num_workers,
             pin_memory=True
         )
-
-        self.val_dataset = DirsDataset(val_img_dir, val_mask_dir, augmentation=self.val_augmentation)
         self.val_loader = DataLoader(
             self.val_dataset,
             batch_size=batch_size,
