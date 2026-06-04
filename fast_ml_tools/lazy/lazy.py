@@ -35,6 +35,7 @@ class LazyNet:
             model_name: str,
             train_img_dir: str, train_mask_dir: str,
             val_img_dir: str = None, val_mask_dir: str = None,
+            train_ratio: float = 0.8, seed: int = 42,
             epochs: int = 100, batch_size: int = 1, lr: float = 1e-4, patience: int = 5,
             verbose: bool = True, device_id: int = 0, num_workers: int = 0,
             classes: list = ['target_class']
@@ -55,9 +56,8 @@ class LazyNet:
             self.train_dataset, self.val_dataset = create_train_val_datasets(
                 img_dir=train_img_dir,
                 mask_dir=train_mask_dir,
-                train_ratio=0.8,
-                val_ratio=0.2,
-                seed=42
+                train_ratio=train_ratio,
+                seed=seed
             )
         else:
             self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
