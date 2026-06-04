@@ -49,8 +49,8 @@ class LazyNet:
 
         self.epochs = epochs
 
-        self.train_augmentation = get_imagenet_encoder_augmentation()
-        self.val_augmentation = get_imagenet_encoder_augmentation()
+        self.train_augmentation = get_imagenet_encoder_augmentation(phase='train')
+        self.val_augmentation = get_imagenet_encoder_augmentation(phase='valid')
 
         if val_img_dir is None or val_mask_dir is None:
             self.train_dataset, self.val_dataset = create_train_val_datasets(
