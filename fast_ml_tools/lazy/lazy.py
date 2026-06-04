@@ -36,7 +36,8 @@ class LazyNet:
             train_img_dir: str, train_mask_dir: str,
             val_img_dir: str = None, val_mask_dir: str = None,
             train_ratio: float = 0.8, seed: int = 42,
-            epochs: int = 100, batch_size: int = 1, lr: float = 1e-4, patience: int = 5,
+            epochs: int = 100, batch_size: int = 1, lr: float = 1e-4,
+            patience: int = 5, factor: float = 0.1,
             verbose: bool = True, device_id: int = 0, num_workers: int = 0,
             classes: list = ['target_class']
     ):
@@ -83,7 +84,7 @@ class LazyNet:
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
             mode='min',
-            factor=0.5,
+            factor=factor,
             patience=patience
         )
 
