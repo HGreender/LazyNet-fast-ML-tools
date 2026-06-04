@@ -17,7 +17,7 @@ def get_image_size_from_json(item):
     if 'width' in item and 'height' in item:
         return (item['width'], item['height'])
     elif 'size' in item['image']:
-        return (item['image']['size'][0], item['image']['size'][1])
+        return (item['image']['size'][1], item['image']['size'][0])
     else:
         return None
 
@@ -67,9 +67,10 @@ def create_mask_from_polygon(polygon_points, img_size):
 
 def process_json_to_mask(
         json_path: str,
-        output_dir: str,
         originals_dir: str,
+        output_dir: str,
         label_id: int,
+        with_postfix: bool = False,
         is_dicom: bool = False
 ):
     '''
@@ -77,6 +78,7 @@ def process_json_to_mask(
     :param output_dir: path of output directory for masks
     :param originals_dir: path of original images directory
     :param label_id: pathology ID in the annotation
+    :param with_postfix: whether to add postfix to the output mask
     :param is_dicom: if True, parse DICOM
     '''
     os.makedirs(output_dir, exist_ok=True)
@@ -118,7 +120,10 @@ def process_json_to_mask(
 
         if has_annotation:
             mask_img = Image.fromarray(combined_mask * 255)
-            save_path = os.path.join(output_dir, f"{img_id}_mask.png")
+            if with_postfix:
+                save_path = os.path.join(output_dir, f"{img_id}_mask.png")
+            else:
+                save_path = os.path.join(output_dir, f"{img_id}.png")
             mask_img.save(save_path)
             if i % 10 == 0:
                 print(f"Обработано: {i}/{len(items)} (Размер: {width}x{height})")
