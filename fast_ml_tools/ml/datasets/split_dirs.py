@@ -79,7 +79,6 @@ def create_train_val_datasets(
         img_dir: str,
         mask_dir: str,
         train_ratio: float = 0.8,
-        val_ratio: float = 0.2,
         seed: int = 42,
         augmentation=None
 ) -> Tuple[ImageMaskDataset, ImageMaskDataset]:
@@ -90,15 +89,12 @@ def create_train_val_datasets(
         img_dir: Путь к папке с оригинальными изображениями
         mask_dir: Путь к папке с масками
         train_ratio: Доля данных для тренировки (по умолчанию 0.8)
-        val_ratio: Доля данных для валидации (по умолчанию 0.2)
         seed: Seed для воспроизводимости разбиения
         augmentation: Функция аугментации (применяется только к train)
 
     Returns:
         Кортеж (train_dataset, val_dataset)
     """
-    assert train_ratio + val_ratio == 1.0, "train_ratio + val_ratio должно равняться 1.0"
-
     # Получаем список всех изображений
     all_imgs = [f for f in os.listdir(img_dir) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
 
