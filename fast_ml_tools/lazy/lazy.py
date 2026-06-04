@@ -7,13 +7,18 @@ from fast_ml_tools.ml.models import efficientnetb4_unet, efficientnetb4_unetpp
 from fast_ml_tools.ml.trainer import Trainer
 from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 from fast_ml_tools.ml.datasets import DirsDataset, create_train_val_datasets
-from fast_ml_tools.ml.losses import DiceBCELoss
+from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss
 from fast_ml_tools.visualization import plot_epochs_data
 
 
 MODEL_FACTORIES = {
     'efficientnetb4_unet': efficientnetb4_unet,
     'efficientnetb4_unet++': efficientnetb4_unetpp,
+}
+
+LOSS_FACTORIES = {
+    'dice_bce': DiceBCELoss,
+    'focal': FocalLoss,
 }
 
 
@@ -32,7 +37,7 @@ def _get_device(num: int = 0):
 class LazyNet:
     def __init__(
             self,
-            model_name: str,
+            model_name: str, loss_name: str,
             train_img_dir: str, train_mask_dir: str,
             val_img_dir: str = None, val_mask_dir: str = None,
             train_ratio: float = 0.8, seed: int = 42,
@@ -81,6 +86,12 @@ class LazyNet:
 
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
         self.loss_fn = DiceBCELoss(dice_weight=0.5, bce_weight=0.5)
+
+        # TODO: Добавить конфиги для функций ошибок?
+        if loss_name not in LOSS_FACTORIES:
+            raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {list(LOSS_FACTORIES.keys())}")
+        self.loss_fn = LOSS_FACTORIES[loss_name]()
+
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
             mode='min',
