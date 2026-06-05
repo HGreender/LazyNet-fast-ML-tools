@@ -12,7 +12,7 @@ class Trainer:
     def __init__(
             self,
             model, train_loader, val_loader,
-            optimizer, loss_fn, scheduler=None,
+            optimizer, loss_fn, metrics: list = None, scheduler=None,
             device='cuda', verbose=True
     ):
         self.model = model.to(device)
@@ -23,6 +23,7 @@ class Trainer:
         self.scheduler = scheduler
         self.device = device
         self.verbose = verbose
+        self.metrics = metrics or []
 
         self.logger = EpochsLogger()
 
@@ -59,6 +60,8 @@ class Trainer:
         """Валидация модели"""
         self.model.eval()
         running_loss = 0.0
+        metric_results = {metric.name: 0.0 for metric in self.metrics}
+        num_batches = 0
 
         with torch.no_grad():
             if self.verbose:
@@ -73,7 +76,20 @@ class Trainer:
                 loss = self.loss_fn(outputs, masks)
                 running_loss += loss.item() * images.size(0)
 
-        return running_loss / len(self.val_loader.dataset)
+                for metric in self.metrics:
+                    metric_value = metric(outputs, masks)
+                    metric_results[metric.name] += metric_value
+
+                num_batches += 1
+
+        avg_loss = running_loss / len(self.val_loader.dataset)
+
+        avg_metrics = {}
+        if num_batches > 0:
+            for name, total in metric_results.items():
+                avg_metrics[name] = total / num_batches
+
+        return avg_loss, avg_metrics
 
     def save_best_model(self, path='./models/best_model.pth'):
         """Сохранение лучшей модели"""
@@ -90,13 +106,14 @@ class Trainer:
 
             # Обучение и валидация
             train_loss = self.train_epoch()
-            val_loss = self.validate()
+            val_loss, val_metrics = self.validate()
 
             # Шаг планировщика
             if self.scheduler:
                 self.scheduler.step(val_loss)
 
-            print(f"Epoch {epoch + 1}/{epochs} | Train: {train_loss:.4f} | Val: {val_loss:.4f}")
+            metrics_str = " | ".join([f"{name}: {value:.4f}" for name, value in val_metrics.items()])
+            print(f"Epoch {epoch + 1}/{epochs} | Train: {train_loss:.4f} | Val: {val_loss:.4f} | {metrics_str}")
 
             # Сохранение лучшей модели
             if val_loss < self.best_loss:
@@ -109,6 +126,7 @@ class Trainer:
                 train_loss=train_loss,
                 val_loss=val_loss,
                 best_loss=self.best_loss,
+                metrics=val_metrics,
                 path=log_path
             )
 

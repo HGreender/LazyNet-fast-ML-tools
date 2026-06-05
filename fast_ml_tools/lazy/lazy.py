@@ -9,6 +9,7 @@ from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 from fast_ml_tools.ml.datasets import DirsDataset, create_train_val_datasets
 from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss
 from fast_ml_tools.visualization import plot_epochs_data
+from fast_ml_tools.ml.metrics import get_segmentation_metrics
 
 
 MODEL_FACTORIES = {
@@ -44,7 +45,7 @@ class LazyNet:
             epochs: int = 100, batch_size: int = 1, lr: float = 1e-4,
             patience: int = 5, factor: float = 0.1,
             verbose: bool = True, device_id: int = 0, num_workers: int = 0,
-            classes: list = ['target_class']
+            classes: list = ['target_class'], metric_names: list = None
     ):
         self.device = _get_device(device_id)
         self.verbose = verbose
@@ -99,15 +100,18 @@ class LazyNet:
             patience=patience
         )
 
+        metrics = get_segmentation_metrics(metric_names)
+
         self.trainer = Trainer(
-            self.model,
-            self.train_loader,
-            self.val_loader,
-            self.optimizer,
-            self.loss_fn,
-            self.scheduler,
-            self.device,
-            self.verbose
+            model=self.model,
+            train_loader=self.train_loader,
+            val_loader=self.val_loader,
+            optimizer=self.optimizer,
+            loss_fn=self.loss_fn,
+            metrics=metrics,
+            scheduler=self.scheduler,
+            device=self.device,
+            verbose=self.verbose,
         )
 
         self.train_logs = None
@@ -126,5 +130,9 @@ class LazyNet:
             log_path=save_logs_path
         )
 
-    def draw_logs(self):
-        plot_epochs_data(self.train_logs)
+    def draw_logs(
+            self,
+            show_metrics: bool = True,
+            metric_names: list[str] = None
+    ):
+        plot_epochs_data(self.train_logs, show_metrics=show_metrics, metric_names=metric_names)
