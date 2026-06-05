@@ -76,30 +76,3 @@ class EpochsLogger:
         except Exception as e:
             print(f"Неожиданная ошибка при загрузке: {e}")
             return False
-
-
-    # def load_logs_json(self, path='./logs/training_logs.json'):
-    #     """Загрузка логов из JSON файла"""
-    #     try:
-    #         with open(path, 'r', encoding='utf-8') as f:
-    #             data = json.load(f)
-    #
-    #         logs = data.get('logs', {})
-    #         self.epoch_logs.epochs = logs.get('epochs', [])
-    #         self.epoch_logs.train_losses = logs.get('train_losses', [])
-    #         self.epoch_logs.val_losses = logs.get('val_losses', [])
-    #         self.epoch_logs.best_loss = data.get('best_val_loss', 1.0)
-    #         self.epoch_logs.metrics = data.get('metrics', [])
-    #
-    #         print(f"Загружено {len(self.epoch_logs.epochs)} эпох из {path}")
-    #         return True
-    #
-    #     except FileNotFoundError:
-    #         print(f"Файл логов не найден: {path}")
-    #         return False
-    #     except json.JSONDecodeError:
-    #         print(f"Ошибка чтения JSON: {path}")
-    #         return False
-    #     except Exception as e:
-    #         print(f"Неожиданная ошибка при загрузке: {e}")
-    #         return False
