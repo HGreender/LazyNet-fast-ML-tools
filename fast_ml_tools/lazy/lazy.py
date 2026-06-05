@@ -174,12 +174,12 @@ class LazyNet:
             save_path: str = None
     ):
         """
-        Предсказание для одного изображения.
+        Предсказание для одного изображения с автоматическим ресайзом маски.
         """
         self.model.eval()
 
-        # Используем вынесенную функцию препроцессинга
-        image_rgb, input_tensor = preprocess_image_for_model(
+        # Получаем также original_size
+        image_rgb, input_tensor, original_size = preprocess_image_for_model(
             image_path,
             self.val_augmentation,
             self.device
@@ -188,8 +188,8 @@ class LazyNet:
         with torch.no_grad():
             output = self.model(input_tensor)
 
-        # Используем вынесенную функцию постпроцессинга
-        binary_mask = postprocess_prediction(output, threshold)
+        # Передаем original_size в постпроцессинг
+        binary_mask = postprocess_prediction(output, threshold, original_size=original_size)
 
         if visualize or save_path:
             show_segmentation(image_rgb, binary_mask, save_path=save_path)
