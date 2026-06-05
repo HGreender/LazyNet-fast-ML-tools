@@ -1,5 +1,6 @@
 import os
 
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 
@@ -8,8 +9,9 @@ from fast_ml_tools.ml.trainer import Trainer
 from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 from fast_ml_tools.ml.datasets import DirsDataset, create_train_val_datasets
 from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss
-from fast_ml_tools.visualization import plot_epochs_data
+from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
+from fast_ml_tools.ml.utils import preprocess_image_for_model, postprocess_prediction
 
 
 MODEL_FACTORIES = {
@@ -40,6 +42,7 @@ class LazyNet:
             self,
             model_name: str, loss_name: str,
             train_img_dir: str, train_mask_dir: str,
+            model_path: str = None,
             val_img_dir: str = None, val_mask_dir: str = None,
             train_ratio: float = 0.8, seed: int = 42,
             epochs: int = 100, batch_size: int = 1, lr: float = 1e-4,
@@ -50,9 +53,17 @@ class LazyNet:
         self.device = _get_device(device_id)
         self.verbose = verbose
 
+        self.model_path = model_path
+
+        if model_name is None and model_path is not None:
+            raise ValueError("Для загрузки модели (model_path) необходимо указать model_name, чтобы знать архитектуру.")
         if model_name not in MODEL_FACTORIES:
             raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {list(MODEL_FACTORIES.keys())}")
+
         self.model = MODEL_FACTORIES[model_name](classes=classes)
+
+        if model_path:
+            self.load_weights(model_path)
 
         self.epochs = epochs
 
@@ -116,6 +127,16 @@ class LazyNet:
 
         self.train_logs = None
 
+    def load_weights(self, path: str):
+        """Загрузка весов модели"""
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Файл модели не найден: {path}")
+
+        # map_location нужен, чтобы грузить на CPU если CUDA недоступна, или на конкретную GPU
+        state_dict = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(state_dict)
+        print(f'Веса загружены из {path}')
+
     def fit(
             self,
             save_model_path: str = './models/best_model.pth',
@@ -130,9 +151,88 @@ class LazyNet:
             log_path=save_logs_path
         )
 
+        self.model_path = save_model_path
+
     def draw_logs(
             self,
+            logs_path: str = None,
             show_metrics: bool = True,
             metric_names: list[str] = None
     ):
-        plot_epochs_data(self.train_logs, show_metrics=show_metrics, metric_names=metric_names)
+        plot_epochs_data(
+            self.train_logs,
+            logs_path=logs_path,
+            show_metrics=show_metrics,
+            metric_names=metric_names
+        )
+
+    def predict_single(
+            self,
+            image_path: str,
+            threshold: float = 0.5,
+            visualize: bool = True,
+            save_path: str = None
+    ):
+        """
+        Предсказание для одного изображения.
+        """
+        self.model.eval()
+
+        # Используем вынесенную функцию препроцессинга
+        image_rgb, input_tensor = preprocess_image_for_model(
+            image_path,
+            self.val_augmentation,
+            self.device
+        )
+
+        with torch.no_grad():
+            output = self.model(input_tensor)
+
+        # Используем вынесенную функцию постпроцессинга
+        binary_mask = postprocess_prediction(output, threshold)
+
+        if visualize or save_path:
+            show_segmentation(image_rgb, binary_mask, save_path=save_path)
+
+        return binary_mask
+
+    def predict_folder(
+            self,
+            input_dir: str,
+            output_dir: str = './predictions',
+            threshold: float = 0.5,
+            mask_suffix: str = '_pred'
+    ):
+        """
+        Пакетное предсказание для всех изображений в папке.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        self.model.eval()
+
+        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tif')
+        files = [f for f in os.listdir(input_dir) if f.lower().endswith(valid_extensions)]
+
+        if not files:
+            print(f"В папке {input_dir} не найдено изображений.")
+            return
+
+        print(f"Начинаю обработку {len(files)} изображений...")
+
+        for filename in tqdm(files, desc="Predicting"):
+            img_path = os.path.join(input_dir, filename)
+
+            # Формируем имя выходного файла
+            name, ext = os.path.splitext(filename)
+            save_viz_path = os.path.join(output_dir, f"{name}{mask_suffix}{ext}")
+
+            try:
+                self.predict_single(
+                    img_path,
+                    threshold=threshold,
+                    visualize=False,
+                    save_path=save_viz_path
+                )
+            except Exception as e:
+                print(f"Ошибка при обработке {filename}: {e}")
+
+        print(f"Готово! Результаты сохранены в {output_dir}")
