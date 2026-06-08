@@ -1,8 +1,10 @@
-from .dice_bce import DiceBCELoss
 from .focal import FocalLoss
+from .dice_bce import DiceBCELoss
+from .dice_focal import DiceFocalLoss
 
 
 __all__ = [
-    "DiceBCELoss",
     "FocalLoss",
+    "DiceBCELoss",
+    "DiceFocalLoss",
 ]

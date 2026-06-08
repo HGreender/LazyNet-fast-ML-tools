@@ -8,7 +8,7 @@ from fast_ml_tools.ml.models import efficientnetb4_unet, efficientnetb4_unetpp
 from fast_ml_tools.ml.trainer import Trainer
 from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 from fast_ml_tools.ml.datasets import DirsDataset, create_train_val_datasets
-from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss
+from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss, DiceFocalLoss
 from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
 from fast_ml_tools.ml.utils import preprocess_image_for_model, postprocess_prediction
@@ -20,8 +20,9 @@ MODEL_FACTORIES = {
 }
 
 LOSS_FACTORIES = {
-    'dice_bce': DiceBCELoss,
     'focal': FocalLoss,
+    'dice_bce': DiceBCELoss,
+    'dice_focal': DiceFocalLoss,
 }
 
 
