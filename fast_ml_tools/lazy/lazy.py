@@ -39,6 +39,8 @@ def _get_device(num: int = 0):
 
 
 class LazyNet:
+    ''' Класс для быстрого обучения моделей бинарной сегментации.
+    '''
     def __init__(
             self,
             model_name: str, loss_name: str,
@@ -76,7 +78,8 @@ class LazyNet:
                 img_dir=train_img_dir,
                 mask_dir=train_mask_dir,
                 train_ratio=train_ratio,
-                seed=train_val_seed
+                seed=train_val_seed,
+                augmentation_fn=get_imagenet_encoder_augmentation
             )
         else:
             self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
