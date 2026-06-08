@@ -23,7 +23,7 @@ def get_segmentation_metrics(metric_names: list = None):
         "Dice": DiceScore(
             num_classes=2,           # Фон (0) и Объект (1)
             average="macro",         # Усреднение по классам (рекомендуется)
-            input_format="one-hot"   # Ожидает тензоры формы [B, C, H, W]
+            input_format="index"   # Ожидает тензоры формы [B, C, H, W]
         )
     }
 
