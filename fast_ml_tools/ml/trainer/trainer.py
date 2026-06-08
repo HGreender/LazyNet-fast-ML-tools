@@ -1,12 +1,9 @@
 import os
 
-import cv2
 import torch
-import numpy as np
 from tqdm import tqdm
 
 from fast_ml_tools.logging import EpochsLogger
-from fast_ml_tools.visualization import show_segmentation
 
 class Trainer:
     def __init__(
