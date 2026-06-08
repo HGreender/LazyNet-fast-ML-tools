@@ -98,7 +98,6 @@ class LazyNet:
         )
 
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
-        self.loss_fn = DiceBCELoss(dice_weight=0.5, bce_weight=0.5)
 
         # TODO: Добавить конфиги для функций ошибок?
         if loss_name not in LOSS_FACTORIES:
