@@ -1,4 +1,5 @@
-import torchmetrics
+from torchmetrics.classification import BinaryJaccardIndex
+from torchmetrics.segmentation import DiceScore
 
 
 def get_segmentation_metrics(metric_names: list = None):
@@ -17,9 +18,13 @@ def get_segmentation_metrics(metric_names: list = None):
 
     metrics_map = {
         # BinaryJaccardIndex - это то же самое, что и IoU для бинарного случая
-        "IoU": torchmetrics.classification.BinaryJaccardIndex(threshold=0.5),
+        "IoU": BinaryJaccardIndex(threshold=0.5),
         # BinaryDice рассчитывает коэффициент Дайса
-        "Dice": torchmetrics.classification.BinaryDice(threshold=0.5),
+        "Dice": DiceScore(
+            num_classes=2,           # Фон (0) и Объект (1)
+            average="macro",         # Усреднение по классам (рекомендуется)
+            input_format="one-hot"   # Ожидает тензоры формы [B, C, H, W]
+        )
     }
 
     selected_metrics = []
