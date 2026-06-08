@@ -79,7 +79,8 @@ class LazyNet:
                 mask_dir=train_mask_dir,
                 train_ratio=train_ratio,
                 seed=train_val_seed,
-                augmentation_fn=get_imagenet_encoder_augmentation
+                train_augmentation=self.train_augmentation,
+                val_augmentation=self.val_augmentation
             )
         else:
             self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)

@@ -81,7 +81,8 @@ def create_train_val_datasets(
         mask_dir: str,
         train_ratio: float = 0.8,
         seed: int = 42,
-        augmentation_fn=None
+        train_augmentation=None,
+        val_augmentation=None
 ) -> Tuple[ImageMaskDataset, ImageMaskDataset]:
     """
     Создаёт тренировочный и валидационный датасеты из папок с изображениями и масками.
@@ -91,7 +92,8 @@ def create_train_val_datasets(
         mask_dir: Путь к папке с масками
         train_ratio: Доля данных для тренировки (по умолчанию 0.8)
         seed: Seed для воспроизводимости разбиения
-        augmentation_fn: Функция, возвращающая объект аугментации для train-датасета
+        train_augmentation: Функция, возвращающая объект аугментации для train-датасета
+        val_augmentation: Функция, возвращающая объект аугментации для val-датасета
 
     Returns:
         Кортеж (train_dataset, val_dataset)
@@ -128,9 +130,6 @@ def create_train_val_datasets(
     val_names = valid_img_names[split_idx:]
 
     print(f"Train samples: {len(train_names)}, Val samples: {len(val_names)}")
-
-    train_augmentation = augmentation_fn(phase='train') if callable(augmentation_fn) else None
-    val_augmentation = augmentation_fn(phase='valid') if callable(augmentation_fn) else None
 
     # Создаём датасеты
     train_dataset = ImageMaskDataset(
