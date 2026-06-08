@@ -80,24 +80,45 @@ class Trainer:
 
                 outputs = self.model(images)
 
-                # Для loss_fn обычно нужны сырые логиты или вероятности и целевые маски
                 loss = self.loss_fn(outputs, masks)
                 running_loss += loss.item() * images.size(0)
 
-                # Обновляем состояние метрик
+                # 1. Подготавливаем Target (маски)
+                # DiceScore(input_format="index") требует LongTensor со значениями классов (0, 1...)
+                target_indices = masks.long()
+                # Если маска имеет форму [B, 1, H, W], убираем размерность канала до [B, H, W]
+                if target_indices.dim() == 4 and target_indices.shape[1] == 1:
+                    target_indices = target_indices.squeeze(1)
+
+                # 2. Подготавливаем Preds (предсказания)
+                # Сначала получаем вероятности (если outputs - это логиты)
+                probs = torch.sigmoid(outputs) if outputs.min() < 0 else outputs
+
+                # Бинаризуем по порогу 0.5, получаем 0 или 1
+                pred_indices = (probs > 0.5).long()
+                # Также убираем размерность канала, если она есть [B, 1, H, W] -> [B, H, W]
+                if pred_indices.dim() == 4 and pred_indices.shape[1] == 1:
+                    pred_indices = pred_indices.squeeze(1)
+
+                # Обновляем метрики
                 for metric in self.metrics:
-                    metric.update(outputs, masks.long())  # masks.long() для классификационных метрик
+                    # Для DiceScore с input_format="index" подаем подготовленные индексы
+                    if isinstance(metric, __import__('torchmetrics.segmentation', fromlist=['DiceScore']).DiceScore):
+                        metric.update(pred_indices, target_indices)
+                    else:
+                        # Для BinaryJaccardIndex и других метрик, которые могут принимать сырые данные
+                        # оставляем оригинальные tensors или адаптируем под них при необходимости
+                        metric.update(outputs, masks)
 
                 num_batches += 1
 
         avg_loss = running_loss / len(self.val_loader.dataset)
 
-        # Вычисляем итоговые значения метрик за эпоху
         avg_metrics = {}
         for metric in self.metrics:
-            # .compute() возвращает тензор, .item() превращает его в python float
             try:
-                avg_metrics[metric.__class__.__name__] = metric.compute().item()
+                val = metric.compute()
+                avg_metrics[metric.__class__.__name__] = val.item() if val.numel() == 1 else val
             except Exception as e:
                 print(f"Ошибка при вычислении метрики {metric.__class__.__name__}: {e}")
                 avg_metrics[metric.__class__.__name__] = 0.0
