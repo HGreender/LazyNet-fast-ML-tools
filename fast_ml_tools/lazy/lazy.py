@@ -45,7 +45,7 @@ class LazyNet:
             train_img_dir: str, train_mask_dir: str,
             model_path: str = None,
             val_img_dir: str = None, val_mask_dir: str = None,
-            train_ratio: float = 0.8, seed: int = 42,
+            train_ratio: float = 0.8, train_val_seed: int = 42,
             epochs: int = 100, batch_size: int = 1, lr: float = 1e-4,
             patience: int = 5, factor: float = 0.1,
             verbose: bool = True, device_id: int = 0, num_workers: int = 0,
@@ -76,7 +76,7 @@ class LazyNet:
                 img_dir=train_img_dir,
                 mask_dir=train_mask_dir,
                 train_ratio=train_ratio,
-                seed=seed
+                seed=train_val_seed
             )
         else:
             self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
