@@ -1,9 +1,8 @@
 import os
-
 import torch
 from tqdm import tqdm
-
 from fast_ml_tools.logging import EpochsLogger
+
 
 class Trainer:
     def __init__(
@@ -22,6 +21,10 @@ class Trainer:
         self.verbose = verbose
         self.metrics = metrics or []
 
+        # Перемещаем метрики на нужное устройство
+        for metric in self.metrics:
+            metric.to(self.device)
+
         self.logger = EpochsLogger()
 
         self.best_loss = float('inf')
@@ -36,6 +39,7 @@ class Trainer:
             pbar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1} [Train]")
         else:
             pbar = self.train_loader
+
         for images, masks in pbar:
             images = images.to(self.device)
             masks = masks.to(self.device)
@@ -57,7 +61,11 @@ class Trainer:
         """Валидация модели"""
         self.model.eval()
         running_loss = 0.0
-        metric_results = {metric.name: 0.0 for metric in self.metrics}
+
+        # Сбрасываем состояние всех метрик перед новой фазой валидации
+        for metric in self.metrics:
+            metric.reset()
+
         num_batches = 0
 
         with torch.no_grad():
@@ -65,26 +73,34 @@ class Trainer:
                 pbar = tqdm(self.val_loader, desc="Validating", leave=False)
             else:
                 pbar = self.val_loader
+
             for images, masks in pbar:
                 images = images.to(self.device)
                 masks = masks.to(self.device)
 
                 outputs = self.model(images)
+
+                # Для loss_fn обычно нужны сырые логиты или вероятности и целевые маски
                 loss = self.loss_fn(outputs, masks)
                 running_loss += loss.item() * images.size(0)
 
+                # Обновляем состояние метрик
                 for metric in self.metrics:
-                    metric_value = metric(outputs, masks)
-                    metric_results[metric.name] += metric_value
+                    metric.update(outputs, masks.long())  # masks.long() для классификационных метрик
 
                 num_batches += 1
 
         avg_loss = running_loss / len(self.val_loader.dataset)
 
+        # Вычисляем итоговые значения метрик за эпоху
         avg_metrics = {}
-        if num_batches > 0:
-            for name, total in metric_results.items():
-                avg_metrics[name] = total / num_batches
+        for metric in self.metrics:
+            # .compute() возвращает тензор, .item() превращает его в python float
+            try:
+                avg_metrics[metric.__class__.__name__] = metric.compute().item()
+            except Exception as e:
+                print(f"Ошибка при вычислении метрики {metric.__class__.__name__}: {e}")
+                avg_metrics[metric.__class__.__name__] = 0.0
 
         return avg_loss, avg_metrics
 
@@ -134,4 +150,3 @@ class Trainer:
         """Загрузка предыдущих логов (опционально, если нужно продолжить тренировку)"""
         if self.logger.load_logs_json(log_path):
             print("Previous logs loaded.")
-            # Здесь можно добавить логику восстановления состояния, если нужно
