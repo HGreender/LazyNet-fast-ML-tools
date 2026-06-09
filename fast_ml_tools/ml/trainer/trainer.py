@@ -159,7 +159,7 @@ class Trainer:
 
         torch.save(checkpoint, path)
         if self.verbose:
-            print(f"💾 Saved checkpoint to {path}")
+            print(f"Saved checkpoint to {path}")
 
     def load_checkpoint(self, path):
         """Загрузка состояния для продолжения обучения"""
@@ -177,7 +177,7 @@ class Trainer:
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
         if self.verbose:
-            print(f"📂 Loaded checkpoint from {path}. Resuming from epoch {self.current_epoch + 1}")
+            print(f"Loaded checkpoint from {path}. Resuming from epoch {self.current_epoch + 1}")
         return True
 
     def fit(
