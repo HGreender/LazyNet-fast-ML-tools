@@ -7,15 +7,23 @@ from fast_ml_tools.logging import EpochsLogger
 class Trainer:
     def __init__(
             self,
-            model, train_loader, val_loader,
-            optimizer, loss_fn, metrics: list = None, scheduler=None,
-            device='cuda', verbose=True
+            model,
+            train_loader,
+            val_loader,
+            optimizer,
+            loss_fn,
+            early_stopping_threshold,
+            metrics: list = None,
+            scheduler=None,
+            device='cuda',
+            verbose=True
     ):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.optimizer = optimizer
         self.loss_fn = loss_fn
+        self.early_stopping_threshold = early_stopping_threshold
         self.scheduler = scheduler
         self.device = device
         self.verbose = verbose
@@ -135,7 +143,12 @@ class Trainer:
         """Основной цикл тренировки"""
         print(f"Start training on {self.device} for {epochs} epochs")
 
+        early_stopping_counter = 0
+
         for epoch in range(epochs):
+            if early_stopping_counter >= self.early_stopping_threshold:
+                return self.logger.epoch_logs
+
             self.current_epoch = epoch
 
             # Обучение и валидация
@@ -153,6 +166,12 @@ class Trainer:
             if val_loss < self.best_loss:
                 self.best_loss = val_loss
                 self.save_best_model(save_path)
+                early_stopping_counter = 0
+            else:
+                early_stopping_counter += 1
+                if early_stopping_counter >= self.early_stopping_threshold:
+                    print(f"Early stopping triggered at epoch {epoch + 1}. Best Val Loss: {self.best_loss:.4f}")
+                    break
 
             # Логирование
             self.logger.add_and_save_logs_json(

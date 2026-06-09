@@ -43,15 +43,26 @@ class LazyNet:
     '''
     def __init__(
             self,
-            model_name: str, loss_name: str,
-            train_img_dir: str, train_mask_dir: str,
+            model_name: str,
+            loss_name: str,
+            train_img_dir: str,
+            train_mask_dir: str,
             model_path: str = None,
-            val_img_dir: str = None, val_mask_dir: str = None,
-            train_ratio: float = 0.8, train_val_seed: int = 42,
-            epochs: int = 100, batch_size: int = 1, lr: float = 1e-4,
-            patience: int = 5, factor: float = 0.1,
-            verbose: bool = True, device_id: int = 0, num_workers: int = 0,
-            classes: list = ['target_class'], metric_names: list = None
+            val_img_dir: str = None,
+            val_mask_dir: str = None,
+            train_ratio: float = 0.8,
+            train_val_seed: int = 42,
+            early_stopping_threshold = 10,
+            epochs: int = 100,
+            batch_size: int = 1,
+            lr: float = 1e-4,
+            lr_patience: int = 8,
+            factor: float = 0.1,
+            verbose: bool = True,
+            device_id: int = 0,
+            num_workers: int = 0,
+            classes: list = ['target_class'],
+            metric_names: list = None
     ):
         self.device = _get_device(device_id)
         self.verbose = verbose
@@ -112,7 +123,7 @@ class LazyNet:
             self.optimizer,
             mode='min',
             factor=factor,
-            patience=patience
+            patience=lr_patience
         )
 
         metrics = get_segmentation_metrics(metric_names)
@@ -123,6 +134,7 @@ class LazyNet:
             val_loader=self.val_loader,
             optimizer=self.optimizer,
             loss_fn=self.loss_fn,
+            early_stopping_threshold=early_stopping_threshold,
             metrics=metrics,
             scheduler=self.scheduler,
             device=self.device,
