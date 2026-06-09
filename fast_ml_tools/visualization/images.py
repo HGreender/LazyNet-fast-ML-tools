@@ -11,14 +11,15 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
-def show_segmentation(image_rgb, binary_mask, save_path=None):
+def show_segmentation(image_rgb, binary_mask, save_path=None, is_show = True):
     """
     Универсальная функция визуализации сегментации.
 
     Args:
-        image_rgb (np.array): Оригинальное изображение в RGB.
-        binary_mask (np.array): Бинарная маска предсказания.
-        save_path (str, optional): Путь для сохранения изображения.
+        :param image_rgb (np.array): Оригинальное изображение в RGB.
+        :param binary_mask (np.array): Бинарная маска предсказания.
+        :param save_path (str, optional): Путь для сохранения изображения.
+        :param is_show: Флаг для отображения
     """
     plt.figure(figsize=(18, 6))
 
@@ -54,7 +55,10 @@ def show_segmentation(image_rgb, binary_mask, save_path=None):
         plt.savefig(save_path)
         print(f"🖼️ Visualization saved to {save_path}")
 
-    plt.show()
+    if is_show:
+        plt.show()
+
+    plt.close('all')
 
 
 def show_n_augmentations(image_path, mask_path, n_samples=3, size = (512, 512)):

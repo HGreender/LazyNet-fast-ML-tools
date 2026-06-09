@@ -216,8 +216,12 @@ class LazyNet:
         # Передаем original_size в постпроцессинг
         binary_mask = postprocess_prediction(output, threshold, original_size=original_size)
 
-        if visualize or save_path:
-            show_segmentation(image_rgb, binary_mask, save_path=save_path)
+        if visualize and save_path:
+            show_segmentation(image_rgb, binary_mask, save_path=save_path, is_show=True)
+        elif visualize:
+            show_segmentation(image_rgb, binary_mask, save_path=None, is_show=True)
+        elif save_path:
+            show_segmentation(image_rgb, binary_mask, save_path=save_path, is_show=False)
 
         return binary_mask
 
@@ -226,6 +230,7 @@ class LazyNet:
             input_dir: str,
             output_dir: str = './predictions',
             threshold: float = 0.5,
+            visualize = False,
             mask_suffix: str = '_pred'
     ):
         """
@@ -254,7 +259,7 @@ class LazyNet:
                 self.predict_single(
                     img_path,
                     threshold=threshold,
-                    visualize=False,
+                    visualize=visualize,
                     save_path=save_viz_path
                 )
             except Exception as e:
