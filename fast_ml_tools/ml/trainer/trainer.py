@@ -191,18 +191,17 @@ class Trainer:
         """Основной цикл тренировки"""
         if resume_from:
             self.load_checkpoint(resume_from)
+            self.load_logs_and_continue(log_path)
             start_epoch = self.current_epoch
-            total_epochs = start_epoch + epochs
-            print(f"Resuming training. Will run until epoch {total_epochs}")
+            print(f"Resuming training. Will run until epoch {epochs}")
         else:
             start_epoch = self.current_epoch
-            total_epochs = epochs
 
-        print(f"Start training on {self.device} | Epochs: {start_epoch} -> {total_epochs}")
+        print(f"Start training on {self.device} | Epochs: {start_epoch} -> {epochs}")
 
         early_stopping_counter = 0
 
-        for epoch in range(start_epoch, total_epochs):
+        for epoch in range(start_epoch, epochs):
             if early_stopping_counter >= self.early_stopping_threshold:
                 print(f"Early stopping triggered at epoch {epoch}. Best Val Loss: {self.best_loss:.4f}")
                 break
