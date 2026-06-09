@@ -88,7 +88,6 @@ def plot_epochs_data(
 
     plt.title('Training History: Losses & Metrics', fontsize=14)
     plt.tight_layout()
-    plt.savefig("training_history_combined.png", dpi=150)
     plt.show()
 
     # 5. Вывод статистики в консоль
