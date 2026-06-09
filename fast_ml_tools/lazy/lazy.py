@@ -57,7 +57,7 @@ class LazyNet:
             batch_size: int = 1,
             lr: float = 1e-4,
             lr_patience: int = 8,
-            factor: float = 0.1,
+            lr_factor: float = 0.1,
             verbose: bool = True,
             device_id: int = 0,
             num_workers: int = 0,
@@ -122,7 +122,7 @@ class LazyNet:
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
             mode='min',
-            factor=factor,
+            factor=lr_factor,
             patience=lr_patience
         )
         self.early_stopping_threshold = early_stopping_threshold
