@@ -1,6 +1,7 @@
 import os
 
 from tqdm import tqdm
+import cv2
 import torch
 from torch.utils.data import DataLoader
 
@@ -12,7 +13,6 @@ from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss, DiceFocalLoss
 from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
 from fast_ml_tools.ml.utils import preprocess_image_for_model, postprocess_prediction
-
 
 MODEL_FACTORIES = {
     'efficientnetb4_unet': efficientnetb4_unet,
@@ -41,6 +41,7 @@ def _get_device(num: int = 0):
 class LazyNet:
     ''' Класс для быстрого обучения моделей бинарной сегментации.
     '''
+
     def __init__(
             self,
             model_name: str,
@@ -52,7 +53,7 @@ class LazyNet:
             val_mask_dir: str = None,
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
-            early_stopping_threshold = 10,
+            early_stopping_threshold=10,
             epochs: int = 100,
             batch_size: int = 1,
             lr: float = 1e-4,
@@ -195,15 +196,22 @@ class LazyNet:
             self,
             image_path: str,
             threshold: float = 0.5,
-            visualize: bool = True,
-            save_path: str = None
+            visualize: bool = False,
+            save_concat_path: str = None,
+            save_mask_path: str = None
     ):
         """
-        Предсказание для одного изображения с автоматическим ресайзом маски.
+        Предсказание для одного изображения.
+
+        Args:
+            image_path: Путь к исходному изображению.
+            threshold: Порог бинаризации.
+            visualize: Показать результат в окне (plt.show).
+            save_concat_path: Сохранить картинку с наложением маски.
+            save_mask_path: Сохранить чистую бинарную маску (PNG).
         """
         self.model.eval()
 
-        # Получаем также original_size
         image_rgb, input_tensor, original_size = preprocess_image_for_model(
             image_path,
             self.val_augmentation,
@@ -213,15 +221,23 @@ class LazyNet:
         with torch.no_grad():
             output = self.model(input_tensor)
 
-        # Передаем original_size в постпроцессинг
         binary_mask = postprocess_prediction(output, threshold, original_size=original_size)
 
-        if visualize and save_path:
-            show_segmentation(image_rgb, binary_mask, save_path=save_path, is_show=True)
-        elif visualize:
-            show_segmentation(image_rgb, binary_mask, save_path=None, is_show=True)
-        elif save_path:
-            show_segmentation(image_rgb, binary_mask, save_path=save_path, is_show=False)
+        # 1. Сохранение чистой маски (если нужно)
+        if save_mask_path:
+            os.makedirs(os.path.dirname(save_mask_path) or '.', exist_ok=True)
+            # Сохраняем как черно-белое изображение
+            cv2.imwrite(save_mask_path, binary_mask * 255)
+            print(f'Mask saved to {save_mask_path}')
+
+        # 2. Визуализация (если нужно показать или сохранить наложение)
+        if visualize or save_concat_path:
+            show_segmentation(
+                image_rgb=image_rgb,
+                binary_mask=binary_mask,
+                save_path=save_concat_path,
+                is_show=visualize
+            )
 
         return binary_mask
 
@@ -230,14 +246,24 @@ class LazyNet:
             input_dir: str,
             output_dir: str = './predictions',
             threshold: float = 0.5,
-            visualize = False,
-            mask_suffix: str = '_pred'
+            save_masks: bool = True,  # Сохранять ли чистые маски
+            save_concat: bool = True,  # Сохранять ли визуализации
+            visualize_console: bool = False,  # Показывать ли каждое окно в процессе (медленно!)
+            mask_suffix: str = '_mask',
+            viz_suffix: str = '_viz'
     ):
         """
         Пакетное предсказание для всех изображений в папке.
+        Создает подпапки 'masks' и 'viz' внутри output_dir.
         """
-        os.makedirs(output_dir, exist_ok=True)
         self.model.eval()
+
+        # Создаем структуры папок
+        masks_dir = os.path.join(output_dir, 'masks') if save_masks else None
+        concat_dir = os.path.join(output_dir, 'concat') if save_concat else None
+
+        if masks_dir: os.makedirs(masks_dir, exist_ok=True)
+        if concat_dir: os.makedirs(concat_dir, exist_ok=True)
 
         valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tif')
         files = [f for f in os.listdir(input_dir) if f.lower().endswith(valid_extensions)]
@@ -250,19 +276,15 @@ class LazyNet:
 
         for filename in tqdm(files, desc="Predicting"):
             img_path = os.path.join(input_dir, filename)
-
-            # Формируем имя выходного файла
             name, ext = os.path.splitext(filename)
-            save_viz_path = os.path.join(output_dir, f"{name}{mask_suffix}{ext}")
 
             try:
                 self.predict_single(
                     img_path,
                     threshold=threshold,
-                    visualize=visualize,
-                    save_path=save_viz_path
+                    visualize=visualize_console,
+                    save_concat_path=os.path.join(concat_dir, f"{name}{viz_suffix}{ext}") if concat_dir else None,
+                    save_mask_path=os.path.join(masks_dir, f"{name}{mask_suffix}.png") if masks_dir else None
                 )
             except Exception as e:
                 print(f"Ошибка при обработке {filename}: {e}")
-
-        print(f"Готово! Результаты сохранены в {output_dir}")
