@@ -191,13 +191,19 @@ class Trainer:
         """Основной цикл тренировки"""
         if resume_from:
             self.load_checkpoint(resume_from)
-            self.load_logs_and_continue(log_path)
-            start_epoch = self.current_epoch
-            print(f"Resuming training. Will run until epoch {epochs}")
+            if self.logger.load_logs_json(log_path):
+                if self.logger.epoch_logs.epochs:
+                    last_logged_epoch = self.logger.epoch_logs.epochs[-1]
+                    start_epoch = max(self.current_epoch, last_logged_epoch + 1)
+                else:
+                    start_epoch = self.current_epoch
+            else:
+                start_epoch = self.current_epoch
+            print(f"Resuming training. Start from epoch {start_epoch}")
         else:
             start_epoch = self.current_epoch
 
-        print(f"Start training on {self.device} | Epochs: {start_epoch} -> {epochs}")
+        print(f"Start training on {self.device} | Epochs: {start_epoch + 1} -> {epochs}")
 
         early_stopping_counter = 0
 

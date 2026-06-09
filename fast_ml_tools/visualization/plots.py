@@ -58,15 +58,20 @@ def plot_epochs_data(
         available_metric_names = list(metrics_list[0].keys()) if metrics_list else []
 
         if specific_names := metric_names:
-            names_to_plot = [name for name in specific_names if name in available_metric_names]
+            names_to_plot = []
+            for name in specific_names:
+                # Ищем соответствие в доступных ключах (которые уже в нижнем регистре из-за load_logs_json)
+                if name.lower() in available_metric_names:
+                    names_to_plot.append(name)  # Оставляем оригинальное имя для легенды
         else:
-            names_to_plot = available_metric_names
+            names_to_plot = available_metric_names  # Тут уже ключи из словаря (в нижнем регистре)
 
         if names_to_plot:
             colors = plt.cm.tab10(np.linspace(0, 1, len(names_to_plot)))
 
             for i, metric_name in enumerate(names_to_plot):
-                metric_values = [epoch_metrics.get(metric_name, np.nan) for epoch_metrics in metrics_list]
+                search_key = metric_name.lower()
+                metric_values = [epoch_metrics.get(search_key, np.nan) for epoch_metrics in metrics_list]
                 ax2.plot(epochs, metric_values, marker='o', linestyle='-',
                          color=colors[i], label=metric_name, linewidth=2, markersize=4)
 

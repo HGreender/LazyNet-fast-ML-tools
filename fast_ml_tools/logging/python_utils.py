@@ -13,7 +13,13 @@ class EpochsLogger:
         self.epoch_logs.epochs.append(epoch)
         self.epoch_logs.train_losses.append(train_loss)
         self.epoch_logs.val_losses.append(val_loss)
-        self.epoch_logs.metrics.append(metrics)
+
+        normalized_metrics = {}
+        if metrics:
+            for k, v in metrics.items():
+                normalized_metrics[k.lower()] = v
+
+        self.epoch_logs.metrics.append(normalized_metrics)
 
     def save_logs_json(self, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)

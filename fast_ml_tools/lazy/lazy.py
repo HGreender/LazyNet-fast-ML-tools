@@ -127,7 +127,8 @@ class LazyNet:
         )
         self.early_stopping_threshold = early_stopping_threshold
 
-        metrics = get_segmentation_metrics(metric_names)
+        self.metric_names = metric_names
+        metrics = get_segmentation_metrics(self.metric_names)
 
         self.trainer = Trainer(
             model=self.model,
@@ -180,6 +181,9 @@ class LazyNet:
             show_metrics: bool = True,
             metric_names: list[str] = None
     ):
+        if metric_names is None:
+            metric_names = self.metric_names
+
         plot_epochs_data(
             self.train_logs,
             logs_path=logs_path,
