@@ -135,19 +135,77 @@ class Trainer:
 
     def save_best_model(self, path='./models/best_model.pth'):
         """Сохранение лучшей модели"""
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        dir_name = os.path.dirname(path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         torch.save(self.model.state_dict(), path)
         print(f"Saved best model to {path}")
 
-    def fit(self, epochs, save_path='./models/best_model.pth', log_path='./logs/training_logs.json'):
+    def save_checkpoint(self, path, extra_state=None):
+        """Сохранение полного состояния тренировки"""
+        dir_name = os.path.dirname(path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+        checkpoint = {
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'epoch': self.current_epoch,
+            'best_loss': self.best_loss,
+        }
+        if self.scheduler:
+            checkpoint['scheduler_state_dict'] = self.scheduler.state_dict()
+        if extra_state:
+            checkpoint.update(extra_state)
+
+        torch.save(checkpoint, path)
+        if self.verbose:
+            print(f"💾 Saved checkpoint to {path}")
+
+    def load_checkpoint(self, path):
+        """Загрузка состояния для продолжения обучения"""
+        if not os.path.exists(path):
+            return False
+
+        checkpoint = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        self.current_epoch = checkpoint.get('epoch', 0)
+        self.best_loss = checkpoint.get('best_loss', float('inf'))
+
+        if self.scheduler and 'scheduler_state_dict' in checkpoint:
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+
+        if self.verbose:
+            print(f"📂 Loaded checkpoint from {path}. Resuming from epoch {self.current_epoch + 1}")
+        return True
+
+    def fit(
+            self,
+            epochs,
+            save_path='./models/best_model.pth',
+            log_path='./logs/training_logs.json',
+            save_checkpoint_path = None,
+            resume_from = None
+    ):
         """Основной цикл тренировки"""
-        print(f"Start training on {self.device} for {epochs} epochs")
+        if resume_from:
+            self.load_checkpoint(resume_from)
+            start_epoch = self.current_epoch
+            total_epochs = start_epoch + epochs
+            print(f"Resuming training. Will run until epoch {total_epochs}")
+        else:
+            start_epoch = self.current_epoch
+            total_epochs = epochs
+
+        print(f"Start training on {self.device} | Epochs: {start_epoch} -> {total_epochs}")
 
         early_stopping_counter = 0
 
-        for epoch in range(epochs):
+        for epoch in range(start_epoch, total_epochs):
             if early_stopping_counter >= self.early_stopping_threshold:
-                return self.logger.epoch_logs
+                print(f"Early stopping triggered at epoch {epoch}. Best Val Loss: {self.best_loss:.4f}")
+                break
 
             self.current_epoch = epoch
 
@@ -166,6 +224,8 @@ class Trainer:
             if val_loss < self.best_loss:
                 self.best_loss = val_loss
                 self.save_best_model(save_path)
+                if save_checkpoint_path:
+                    self.save_checkpoint(save_checkpoint_path)
                 early_stopping_counter = 0
             else:
                 early_stopping_counter += 1

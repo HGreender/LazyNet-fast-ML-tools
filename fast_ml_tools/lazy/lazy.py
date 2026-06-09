@@ -125,6 +125,7 @@ class LazyNet:
             factor=factor,
             patience=lr_patience
         )
+        self.early_stopping_threshold = early_stopping_threshold
 
         metrics = get_segmentation_metrics(metric_names)
 
@@ -134,7 +135,7 @@ class LazyNet:
             val_loader=self.val_loader,
             optimizer=self.optimizer,
             loss_fn=self.loss_fn,
-            early_stopping_threshold=early_stopping_threshold,
+            early_stopping_threshold=self.early_stopping_threshold,
             metrics=metrics,
             scheduler=self.scheduler,
             device=self.device,
@@ -157,14 +158,18 @@ class LazyNet:
             self,
             save_model_path: str = './models/best_model.pth',
             save_logs_path: str = './logs/training_logs.json',
+            save_checkpoint_path: str = None,
+            resume_from_checkpoint: str = None
     ):
         os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
         os.makedirs(os.path.dirname(save_logs_path), exist_ok=True)
 
         self.train_logs = self.trainer.fit(
-            self.epochs,
+            epochs=self.epochs,
             save_path=save_model_path,
-            log_path=save_logs_path
+            log_path=save_logs_path,
+            save_checkpoint_path=save_checkpoint_path,
+            resume_from=resume_from_checkpoint
         )
 
         self.model_path = save_model_path
