@@ -127,3 +127,4 @@ def process_json_to_mask(
             mask_img.save(save_path)
             if i % 10 == 0:
                 print(f"Обработано: {i}/{len(items)} (Размер: {width}x{height})")
+    print("Обработка завершена!")
