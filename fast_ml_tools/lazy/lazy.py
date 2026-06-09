@@ -159,7 +159,7 @@ class LazyNet:
             save_model_path: str = './models/best_model.pth',
             save_logs_path: str = './logs/training_logs.json',
             save_checkpoint_path: str = None,
-            resume_from_checkpoint: str = None
+            load_checkpoint_path: str = None
     ):
         os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
         os.makedirs(os.path.dirname(save_logs_path), exist_ok=True)
@@ -169,7 +169,7 @@ class LazyNet:
             save_path=save_model_path,
             log_path=save_logs_path,
             save_checkpoint_path=save_checkpoint_path,
-            resume_from=resume_from_checkpoint
+            resume_from=load_checkpoint_path
         )
 
         self.model_path = save_model_path
