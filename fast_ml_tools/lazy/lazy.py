@@ -1,5 +1,4 @@
 import os
-
 from tqdm import tqdm
 import cv2
 import torch
@@ -39,15 +38,15 @@ def _get_device(num: int = 0):
 
 
 class LazyNet:
-    ''' Класс для быстрого обучения моделей бинарной сегментации.
+    ''' Класс для быстрого обучения моделей бинарной сегментации и инференса.
     '''
 
     def __init__(
             self,
             model_name: str,
-            loss_name: str,
-            train_img_dir: str,
-            train_mask_dir: str,
+            loss_name: str = None,  # <-- Теперь None
+            train_img_dir: str = None,  # <-- Теперь None
+            train_mask_dir: str = None,  # <-- Теперь None
             model_path: str = None,
             val_img_dir: str = None,
             val_mask_dir: str = None,
@@ -67,11 +66,11 @@ class LazyNet:
     ):
         self.device = _get_device(device_id)
         self.verbose = verbose
-
         self.model_path = model_path
 
+        # 1. Инициализация модели
         if model_name is None and model_path is not None:
-            raise ValueError("Для загрузки модели (model_path) необходимо указать model_name, чтобы знать архитектуру.")
+            raise ValueError("Для загрузки модели (model_path) необходимо указать model_name.")
         if model_name not in MODEL_FACTORIES:
             raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {list(MODEL_FACTORIES.keys())}")
 
@@ -81,68 +80,79 @@ class LazyNet:
             self.load_weights(model_path)
 
         self.epochs = epochs
+        self.metric_names = metric_names
 
+        # Аугментации нужны всегда (и для трейна, и для инференса)
         self.train_augmentation = get_imagenet_encoder_augmentation(phase='train')
         self.val_augmentation = get_imagenet_encoder_augmentation(phase='valid')
 
-        if val_img_dir is None or val_mask_dir is None:
-            self.train_dataset, self.val_dataset = create_train_val_datasets(
-                img_dir=train_img_dir,
-                mask_dir=train_mask_dir,
-                train_ratio=train_ratio,
-                seed=train_val_seed,
-                train_augmentation=self.train_augmentation,
-                val_augmentation=self.val_augmentation
+        # 2. Датасеты и Лоадеры (только если есть пути к данным)
+        self.train_loader = None
+        self.val_loader = None
+
+        if train_img_dir and train_mask_dir:
+            if val_img_dir is None or val_mask_dir is None:
+                self.train_dataset, self.val_dataset = create_train_val_datasets(
+                    img_dir=train_img_dir,
+                    mask_dir=train_mask_dir,
+                    train_ratio=train_ratio,
+                    seed=train_val_seed,
+                    train_augmentation=self.train_augmentation,
+                    val_augmentation=self.val_augmentation
+                )
+            else:
+                self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
+                self.val_dataset = DirsDataset(val_img_dir, val_mask_dir, augmentation=self.val_augmentation)
+
+            self.train_loader = DataLoader(
+                self.train_dataset,
+                batch_size=batch_size,
+                shuffle=True,
+                num_workers=num_workers,
+                pin_memory=True
             )
-        else:
-            self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
-            self.val_dataset = DirsDataset(val_img_dir, val_mask_dir, augmentation=self.val_augmentation)
+            self.val_loader = DataLoader(
+                self.val_dataset,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=num_workers,
+                pin_memory=True
+            )
 
-        self.train_loader = DataLoader(
-            self.train_dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=num_workers,
-            pin_memory=True
-        )
-        self.val_loader = DataLoader(
-            self.val_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers,
-            pin_memory=True
-        )
+        # 3. Оптимизатор, Лосс и Трейнер (только если есть данные и имя лосса)
+        self.optimizer = None
+        self.loss_fn = None
+        self.scheduler = None
+        self.trainer = None
 
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
+        if self.train_loader and loss_name:
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
 
-        # TODO: Добавить конфиги для функций ошибок?
-        if loss_name not in LOSS_FACTORIES:
-            raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {list(LOSS_FACTORIES.keys())}")
-        self.loss_fn = LOSS_FACTORIES[loss_name]()
+            if loss_name not in LOSS_FACTORIES:
+                raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {list(LOSS_FACTORIES.keys())}")
+            self.loss_fn = LOSS_FACTORIES[loss_name]()
 
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer,
-            mode='min',
-            factor=lr_factor,
-            patience=lr_patience
-        )
-        self.early_stopping_threshold = early_stopping_threshold
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode='min',
+                factor=lr_factor,
+                patience=lr_patience
+            )
 
-        self.metric_names = metric_names
-        metrics = get_segmentation_metrics(self.metric_names)
+            metrics = get_segmentation_metrics(metric_names)
 
-        self.trainer = Trainer(
-            model=self.model,
-            train_loader=self.train_loader,
-            val_loader=self.val_loader,
-            optimizer=self.optimizer,
-            loss_fn=self.loss_fn,
-            early_stopping_threshold=self.early_stopping_threshold,
-            metrics=metrics,
-            scheduler=self.scheduler,
-            device=self.device,
-            verbose=self.verbose,
-        )
+            self.trainer = Trainer(
+                model=self.model,
+                train_loader=self.train_loader,
+                val_loader=self.val_loader,
+                optimizer=self.optimizer,
+                loss_fn=self.loss_fn,
+                early_stopping_threshold=early_stopping_threshold,
+                metrics=metrics,
+                scheduler=self.scheduler,
+                device=self.device,
+                verbose=self.verbose,
+            )
 
         self.train_logs = None
 
@@ -151,9 +161,9 @@ class LazyNet:
         if not os.path.exists(path):
             raise FileNotFoundError(f"Файл модели не найден: {path}")
 
-        # map_location нужен, чтобы грузить на CPU если CUDA недоступна, или на конкретную GPU
         state_dict = torch.load(path, map_location=self.device)
         self.model.load_state_dict(state_dict)
+        self.model.to(self.device)
         print(f'Веса загружены из {path}')
 
     def fit(
@@ -163,8 +173,12 @@ class LazyNet:
             save_checkpoint_path: str = None,
             load_checkpoint_path: str = None
     ):
-        os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
-        os.makedirs(os.path.dirname(save_logs_path), exist_ok=True)
+        if self.trainer is None:
+            raise RuntimeError(
+                "Невозможно запустить fit(): не инициализирован Trainer. Проверьте наличие train_img_dir, train_mask_dir и loss_name.")
+
+        os.makedirs(os.path.dirname(save_model_path) or '.', exist_ok=True)
+        os.makedirs(os.path.dirname(save_logs_path) or '.', exist_ok=True)
 
         self.train_logs = self.trainer.fit(
             epochs=self.epochs,
@@ -200,16 +214,7 @@ class LazyNet:
             save_concat_path: str = None,
             save_mask_path: str = None
     ):
-        """
-        Предсказание для одного изображения.
-
-        Args:
-            image_path: Путь к исходному изображению.
-            threshold: Порог бинаризации.
-            visualize: Показать результат в окне (plt.show).
-            save_concat_path: Сохранить картинку с наложением маски.
-            save_mask_path: Сохранить чистую бинарную маску (PNG).
-        """
+        """Предсказание для одного изображения."""
         self.model.eval()
 
         image_rgb, input_tensor, original_size = preprocess_image_for_model(
@@ -223,14 +228,11 @@ class LazyNet:
 
         binary_mask = postprocess_prediction(output, threshold, original_size=original_size)
 
-        # 1. Сохранение чистой маски (если нужно)
         if save_mask_path:
             os.makedirs(os.path.dirname(save_mask_path) or '.', exist_ok=True)
-            # Сохраняем как черно-белое изображение
             cv2.imwrite(save_mask_path, binary_mask * 255)
             print(f'Mask saved to {save_mask_path}')
 
-        # 2. Визуализация (если нужно показать или сохранить наложение)
         if visualize or save_concat_path:
             show_segmentation(
                 image_rgb=image_rgb,
@@ -246,19 +248,15 @@ class LazyNet:
             input_dir: str,
             output_dir: str = './predictions',
             threshold: float = 0.5,
-            save_masks: bool = True,  # Сохранять ли чистые маски
-            save_concat: bool = True,  # Сохранять ли визуализации
-            visualize_console: bool = False,  # Показывать ли каждое окно в процессе (медленно!)
+            save_masks: bool = True,
+            save_concat: bool = True,
+            visualize_console: bool = False,
             mask_suffix: str = '_mask',
             viz_suffix: str = '_viz'
     ):
-        """
-        Пакетное предсказание для всех изображений в папке.
-        Создает подпапки 'masks' и 'viz' внутри output_dir.
-        """
+        """Пакетное предсказание для всех изображений в папке."""
         self.model.eval()
 
-        # Создаем структуры папок
         masks_dir = os.path.join(output_dir, 'masks') if save_masks else None
         concat_dir = os.path.join(output_dir, 'concat') if save_concat else None
 
@@ -288,3 +286,5 @@ class LazyNet:
                 )
             except Exception as e:
                 print(f"Ошибка при обработке {filename}: {e}")
+
+        print(f"Готово! Результаты сохранены в {output_dir}")
