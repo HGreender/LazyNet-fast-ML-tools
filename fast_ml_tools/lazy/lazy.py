@@ -1,13 +1,14 @@
 import os
+
 from tqdm import tqdm
 import cv2
 import torch
 from torch.utils.data import DataLoader
 
+from fast_ml_tools.ml.datasets import create_train_val_datasets_from_multiple_dirs, MultiDirsDataset
 from fast_ml_tools.ml.models import efficientnetb4_unet, efficientnetb4_unetpp
 from fast_ml_tools.ml.trainer import Trainer
 from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
-from fast_ml_tools.ml.datasets import DirsDataset, create_train_val_datasets
 from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss, DiceFocalLoss
 from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
@@ -39,6 +40,7 @@ def _get_device(num: int = 0):
 
 class LazyNet:
     ''' Класс для быстрого обучения моделей бинарной сегментации и инференса.
+    Работает со списками папок с изображениями и масками.
     '''
 
     def __init__(
@@ -46,10 +48,10 @@ class LazyNet:
             model_name: str,
             model_path: str = None,
             loss_name: str = None,
-            train_img_dir: str = None,
-            train_mask_dir: str = None,
-            val_img_dir: str = None,
-            val_mask_dir: str = None,
+            train_img_dirs: list[str] = None,
+            train_mask_dirs: list[str] = None,
+            val_img_dirs: list[str] = None,
+            val_mask_dirs: list[str] = None,
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
             early_stopping_threshold=10,
@@ -86,38 +88,62 @@ class LazyNet:
         self.train_augmentation = get_imagenet_encoder_augmentation(phase='train')
         self.val_augmentation = get_imagenet_encoder_augmentation(phase='valid')
 
-        # 2. Датасеты и Лоадеры (только если есть пути к данным)
+        # 2. Датасеты и Лоадеры
         self.train_loader = None
         self.val_loader = None
+        self.train_dataset = None
+        self.val_dataset = None
 
-        if train_img_dir and train_mask_dir:
-            if val_img_dir is None or val_mask_dir is None:
-                self.train_dataset, self.val_dataset = create_train_val_datasets(
-                    img_dir=train_img_dir,
-                    mask_dir=train_mask_dir,
+        # Проверяем наличие обязательных параметров для train
+        if train_img_dirs and train_mask_dirs:
+            if len(train_img_dirs) != len(train_mask_dirs):
+                raise ValueError("Количество папок с изображениями и масками для обучения должно совпадать.")
+
+            # Режим работы с множественными папками
+            if val_img_dirs is None or val_mask_dirs is None:
+                # Автоматическое разделение на train/val из всех указанных папок
+                self.train_dataset, self.val_dataset = create_train_val_datasets_from_multiple_dirs(
+                    img_dirs=train_img_dirs,
+                    mask_dirs=train_mask_dirs,
                     train_ratio=train_ratio,
                     seed=train_val_seed,
                     train_augmentation=self.train_augmentation,
                     val_augmentation=self.val_augmentation
                 )
             else:
-                self.train_dataset = DirsDataset(train_img_dir, train_mask_dir, augmentation=self.train_augmentation)
-                self.val_dataset = DirsDataset(val_img_dir, val_mask_dir, augmentation=self.val_augmentation)
+                if len(val_img_dirs) != len(val_mask_dirs):
+                    raise ValueError("Количество папок с изображениями и масками для валидации должно совпадать.")
 
-            self.train_loader = DataLoader(
-                self.train_dataset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=num_workers,
-                pin_memory=True
-            )
-            self.val_loader = DataLoader(
-                self.val_dataset,
-                batch_size=batch_size,
-                shuffle=False,
-                num_workers=num_workers,
-                pin_memory=True
-            )
+                # Раздельные папки для train и val
+                self.train_dataset = MultiDirsDataset(
+                    img_dirs=train_img_dirs,
+                    mask_dirs=train_mask_dirs,
+                    augmentation=self.train_augmentation
+                )
+                self.val_dataset = MultiDirsDataset(
+                    img_dirs=val_img_dirs,
+                    mask_dirs=val_mask_dirs,
+                    augmentation=self.val_augmentation
+                )
+
+            # Создаем лоадеры если датасеты существуют
+            if self.train_dataset:
+                self.train_loader = DataLoader(
+                    self.train_dataset,
+                    batch_size=batch_size,
+                    shuffle=True,
+                    num_workers=num_workers,
+                    pin_memory=True
+                )
+
+            if self.val_dataset:
+                self.val_loader = DataLoader(
+                    self.val_dataset,
+                    batch_size=batch_size,
+                    shuffle=False,
+                    num_workers=num_workers,
+                    pin_memory=True
+                )
 
         # 3. Оптимизатор, Лосс и Трейнер (только если есть данные и имя лосса)
         self.optimizer = None
@@ -125,7 +151,6 @@ class LazyNet:
         self.scheduler = None
         self.trainer = None
 
-        # TODO: Добавить конфиги для функций ошибок?
         if self.train_loader and loss_name:
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
 
@@ -176,7 +201,8 @@ class LazyNet:
     ):
         if self.trainer is None:
             raise RuntimeError(
-                "Невозможно запустить fit(): не инициализирован Trainer. Проверьте наличие train_img_dir, train_mask_dir и loss_name.")
+                "Невозможно запустить fit(): не инициализирован Trainer. "
+                "Проверьте наличие train_img_dirs, train_mask_dirs и loss_name.")
 
         os.makedirs(os.path.dirname(save_model_path) or '.', exist_ok=True)
         os.makedirs(os.path.dirname(save_logs_path) or '.', exist_ok=True)
