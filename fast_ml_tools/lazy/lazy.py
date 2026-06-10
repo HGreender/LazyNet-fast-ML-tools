@@ -196,7 +196,7 @@ class LazyNet:
             self,
             image_path: str,
             threshold: float = 0.5,
-            visualize: bool = False,
+            visualize: bool = True,
             save_concat_path: str = None,
             save_mask_path: str = None
     ):
