@@ -12,7 +12,7 @@ from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss, DiceFocalLoss
 from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
-from fast_ml_tools.ml.utils import preprocess_image_for_model, postprocess_prediction
+from fast_ml_tools.ml.utils import preprocess_image_for_model, postprocess_prediction, get_device
 
 MODEL_FACTORIES = {
     'efficientnetb4_unet': efficientnetb4_unet,
@@ -24,18 +24,6 @@ LOSS_FACTORIES = {
     'dice_bce': DiceBCELoss,
     'dice_focal': DiceFocalLoss,
 }
-
-
-def _get_device(num: int = 0):
-    """Получение устройства (CUDA/CPU)"""
-    print(f"Доступно карт: {torch.cuda.device_count()}")
-    if num >= torch.cuda.device_count() or num < 0:
-        num = 0
-        print("Выбрана дефолтная видеокарта")
-
-    device = torch.device(f"cuda:{num}" if torch.cuda.is_available() else "cpu")
-    print(f"Используемое устройство: {device}")
-    return device
 
 
 class LazyNet:
@@ -66,7 +54,7 @@ class LazyNet:
             classes: list = ['target_class'],
             metric_names: list = None
     ):
-        self.device = _get_device(device_id)
+        self.device = get_device(device_id)
         self.verbose = verbose
         self.model_path = model_path
 
