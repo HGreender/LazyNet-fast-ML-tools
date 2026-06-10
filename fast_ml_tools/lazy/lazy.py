@@ -44,10 +44,10 @@ class LazyNet:
     def __init__(
             self,
             model_name: str,
-            loss_name: str = None,  # <-- Теперь None
-            train_img_dir: str = None,  # <-- Теперь None
-            train_mask_dir: str = None,  # <-- Теперь None
             model_path: str = None,
+            loss_name: str = None,
+            train_img_dir: str = None,
+            train_mask_dir: str = None,
             val_img_dir: str = None,
             val_mask_dir: str = None,
             train_ratio: float = 0.8,
@@ -125,6 +125,7 @@ class LazyNet:
         self.scheduler = None
         self.trainer = None
 
+        # TODO: Добавить конфиги для функций ошибок?
         if self.train_loader and loss_name:
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
 
