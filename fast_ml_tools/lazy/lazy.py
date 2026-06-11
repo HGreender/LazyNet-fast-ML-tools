@@ -60,9 +60,9 @@ class LazyNet:
 
         # 1. Инициализация модели
         if model_name is None and model_path is not None:
-            raise ValueError("Для загрузки модели (model_path) необходимо указать model_name.")
+            raise ValueError("Необходимо указать model_name.")
         if model_name not in MODEL_FACTORIES:
-            raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {list(MODEL_FACTORIES.keys())}")
+            raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {self.available_models}")
 
         self.model = MODEL_FACTORIES[model_name](classes=classes)
 
@@ -143,7 +143,7 @@ class LazyNet:
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
 
             if loss_name not in LOSS_FACTORIES:
-                raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {list(LOSS_FACTORIES.keys())}")
+                raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {self.available_losses}")
             self.loss_fn = LOSS_FACTORIES[loss_name]()
 
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -169,6 +169,14 @@ class LazyNet:
             )
 
         self.train_logs = None
+
+    @property
+    def available_models(self) -> list[str]:
+        return list(MODEL_FACTORIES.keys())
+
+    @property
+    def available_losses(self) -> list[str]:
+        return list(LOSS_FACTORIES.keys())
 
     def load_weights(self, path: str):
         """Загрузка весов модели"""
