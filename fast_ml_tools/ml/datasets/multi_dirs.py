@@ -13,18 +13,26 @@ class MultiDirsDataset(Dataset):
     Собирает все валидные пары изображение-маска из всех указанных папок.
     """
 
-    def __init__(self, img_dirs: list[str], mask_dirs: list[str], augmentation=None):
+    def __init__(
+        self, 
+        img_dirs: list[str],
+        mask_dirs: list[str],
+        augmentation=None,
+        mask_suffix: str = ""
+    ):
         """
         Args:
             img_dirs: Список путей к папкам с изображениями
             mask_dirs: Список путей к папкам с масками (должен быть той же длины, что и img_dirs)
             augmentation: Функция аугментации (опционально)
+            mask_suffix: Постфикс для имени файла маски (например, "_mask" для img123_mask.png)
         """
         if len(img_dirs) != len(mask_dirs):
             raise ValueError(f"Количество папок с изображениями ({len(img_dirs)}) "
                              f"не совпадает с количеством папок с масками ({len(mask_dirs)})")
 
         self.augmentation = augmentation
+        self.mask_suffix = mask_suffix
         self.samples = []  # Список кортежей (img_path, mask_path)
 
         # Собираем все валидные пары из всех папок
@@ -42,7 +50,8 @@ class MultiDirsDataset(Dataset):
 
             for img_name in all_imgs:
                 name_without_ext = os.path.splitext(img_name)[0]
-                mask_name = name_without_ext + '.png'
+                # Формируем имя маски с учетом суффикса
+                mask_name = f"{name_without_ext}{self.mask_suffix}.png"
                 mask_path = os.path.join(mask_dir, mask_name)
 
                 if os.path.exists(mask_path):
@@ -168,7 +177,8 @@ def create_train_val_datasets_from_multiple_dirs(
         train_ratio: float = 0.8,
         seed: int = 42,
         train_augmentation=None,
-        val_augmentation=None
+        val_augmentation=None,
+        mask_suffix: str = ""
 ) -> tuple[MultiDirsDatasetFromSamples, MultiDirsDatasetFromSamples]:
     """
     Создаёт тренировочный и валидационный датасеты из нескольких папок с изображениями и масками.
@@ -180,6 +190,7 @@ def create_train_val_datasets_from_multiple_dirs(
         seed: Seed для воспроизводимости разбиения
         train_augmentation: Функция аугментации для train-датасета
         val_augmentation: Функция аугментации для val-датасета
+        mask_suffix: Постфикс для имени файла маски (например, "_mask" для img123_mask.png)
 
     Returns:
         Кортеж (train_dataset, val_dataset)
@@ -207,7 +218,7 @@ def create_train_val_datasets_from_multiple_dirs(
 
         for img_name in all_imgs:
             name_without_ext = os.path.splitext(img_name)[0]
-            mask_name = name_without_ext + '.png'
+            mask_name = f"{name_without_ext}{mask_suffix}.png"
             mask_path = os.path.join(mask_dir, mask_name)
 
             if os.path.exists(mask_path):

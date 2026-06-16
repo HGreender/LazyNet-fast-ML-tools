@@ -40,6 +40,7 @@ class LazyNet:
             train_mask_dirs: list[str] = None,
             val_img_dirs: list[str] = None,
             val_mask_dirs: list[str] = None,
+            mask_suffix: str = "",
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
             early_stopping_threshold=10,
@@ -57,6 +58,7 @@ class LazyNet:
         self.device = get_device(device_id)
         self.verbose = verbose
         self.model_path = model_path
+        self.mask_suffix = mask_suffix
 
         # 1. Инициализация модели
         if model_name is None and model_path is not None:
@@ -96,7 +98,8 @@ class LazyNet:
                     train_ratio=train_ratio,
                     seed=train_val_seed,
                     train_augmentation=self.train_augmentation,
-                    val_augmentation=self.val_augmentation
+                    val_augmentation=self.val_augmentation,
+                    mask_suffix=mask_suffix
                 )
             else:
                 if len(val_img_dirs) != len(val_mask_dirs):
@@ -106,12 +109,14 @@ class LazyNet:
                 self.train_dataset = MultiDirsDataset(
                     img_dirs=train_img_dirs,
                     mask_dirs=train_mask_dirs,
-                    augmentation=self.train_augmentation
+                    augmentation=self.train_augmentation,
+                    mask_suffix=mask_suffix
                 )
                 self.val_dataset = MultiDirsDataset(
                     img_dirs=val_img_dirs,
                     mask_dirs=val_mask_dirs,
-                    augmentation=self.val_augmentation
+                    augmentation=self.val_augmentation,
+                    mask_suffix=mask_suffix
                 )
 
             # Создаем лоадеры если датасеты существуют
