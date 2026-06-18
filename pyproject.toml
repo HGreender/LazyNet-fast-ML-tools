@@ -14,10 +14,9 @@ authors = [
 ]
 
 # Базовые зависимости
-# Мы ослабляем требования, чтобы pip мог разрешить конфликты (особенно numpy)
 dependencies = [
-    "numpy>=1.26.4",  # Минимальная версия, которую вы использовали. Pip поставит 2.x, если нужно другим пакетам
-    "torch>=2.5.0",   # Исправлено на реальную существующую версию. Если нужна именно 2.11 (nightly), нужен спец. индекс
+    "numpy>=1.26.4",
+    "torch>=2.5.0",
     "torchvision>=0.20.0",
     "tqdm>=4.67.0",
     "pydantic>=2.10.0",
@@ -39,8 +38,6 @@ logging = [
 # 2. Визуализация
 viz = [
     "matplotlib>=3.9.0",
-    # Важно: opencv-python>=4.10 требует numpy>=2.
-    # Если вам критичен numpy<2, нужно использовать opencv-python<4.10
     "opencv-python>=4.10.0",
     "opencv-python-headless>=4.10.0",
     "pillow>=10.0.0",
@@ -50,8 +47,9 @@ viz = [
 ml-extra = [
     "timm>=1.0.0",
     "segmentation-models-pytorch>=0.4.0",
-    "albumentations>=2.0.0", # Требует numpy>=2
+    "albumentations>=2.0.0",
     "monai>=1.4.0",
+    "ultralytics>=8.3.0",
     "pytorch-lightning>=2.4.0",
     "huggingface-hub>=0.25.0",
     "safetensors>=0.4.0",
