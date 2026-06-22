@@ -1,5 +1,4 @@
 import os
-
 from tqdm import tqdm
 import cv2
 import torch
@@ -34,7 +33,7 @@ class LazyNet:
 
     def __init__(
             self,
-            model_name: str,
+            model_name: str = None,
             model_path: str = None,
             model = None,
             loss_name: str = None,
@@ -45,7 +44,7 @@ class LazyNet:
             mask_suffix: str = "",
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
-            early_stopping_threshold=10,
+            early_stopping_threshold = 10,
             epochs: int = 100,
             batch_size: int = 1,
             lr: float = 1e-4,
@@ -61,6 +60,7 @@ class LazyNet:
         self.verbose = verbose
         self.model_path = model_path
         self.mask_suffix = mask_suffix
+        self.model = None
 
         if model is not None:
             self.model = model
@@ -68,16 +68,15 @@ class LazyNet:
             if model_name not in MODEL_FACTORIES:
                 raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {self.available_models}")
             self.model = MODEL_FACTORIES[model_name](classes=classes)
-        else:
-            raise ValueError("Необходимо указать либо model, либо model_name.")
 
-        if model_path:
-            self.load_weights(model_path)
+        if self.model is not None:
+            if model_path:
+                self.load_weights(model_path)
 
         self.epochs = epochs
         self.metric_names = metric_names
 
-        # Аугментации нужны всегда (и для трейна, и для инференса)
+        # Аугментации нужны всегда
         self.train_augmentation = get_imagenet_encoder_augmentation(phase='train')
         self.val_augmentation = get_imagenet_encoder_augmentation(phase='valid')
 
@@ -87,14 +86,11 @@ class LazyNet:
         self.train_dataset = None
         self.val_dataset = None
 
-        # Проверяем наличие обязательных параметров для train
         if train_img_dirs and train_mask_dirs:
             if len(train_img_dirs) != len(train_mask_dirs):
                 raise ValueError("Количество папок с изображениями и масками для обучения должно совпадать.")
 
-            # Режим работы с множественными папками
             if val_img_dirs is None or val_mask_dirs is None:
-                # Автоматическое разделение на train/val из всех указанных папок
                 self.train_dataset, self.val_dataset = create_train_val_datasets_from_multiple_dirs(
                     img_dirs=train_img_dirs,
                     mask_dirs=train_mask_dirs,
@@ -108,7 +104,6 @@ class LazyNet:
                 if len(val_img_dirs) != len(val_mask_dirs):
                     raise ValueError("Количество папок с изображениями и масками для валидации должно совпадать.")
 
-                # Раздельные папки для train и val
                 self.train_dataset = MultiDirsDataset(
                     img_dirs=train_img_dirs,
                     mask_dirs=train_mask_dirs,
@@ -122,7 +117,6 @@ class LazyNet:
                     mask_suffix=mask_suffix
                 )
 
-            # Создаем лоадеры если датасеты существуют
             if self.train_dataset:
                 self.train_loader = DataLoader(
                     self.train_dataset,
@@ -141,13 +135,14 @@ class LazyNet:
                     pin_memory=True
                 )
 
-        # 3. Оптимизатор, Лосс и Трейнер (только если есть данные и имя лосса)
+        # 3. Оптимизатор, Лосс и Трейнер
         self.optimizer = None
         self.loss_fn = None
         self.scheduler = None
         self.trainer = None
 
-        if self.train_loader and loss_name:
+        # Трейнер создаем только если есть модель, данные и лосс
+        if self.model is not None and self.train_loader and loss_name:
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
 
             if loss_name not in LOSS_FACTORIES:
@@ -188,6 +183,8 @@ class LazyNet:
 
     def load_weights(self, path: str):
         """Загрузка весов модели"""
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована. Укажите model_name или передайте объект model.")
         if not os.path.exists(path):
             raise FileNotFoundError(f"Файл модели не найден: {path}")
 
@@ -206,7 +203,7 @@ class LazyNet:
         if self.trainer is None:
             raise RuntimeError(
                 "Невозможно запустить fit(): не инициализирован Trainer. "
-                "Проверьте наличие train_img_dirs, train_mask_dirs и loss_name.")
+                "Проверьте наличие model, train_img_dirs, train_mask_dirs и loss_name.")
 
         os.makedirs(os.path.dirname(save_model_path) or '.', exist_ok=True)
         os.makedirs(os.path.dirname(save_logs_path) or '.', exist_ok=True)
@@ -230,12 +227,16 @@ class LazyNet:
         if metric_names is None:
             metric_names = self.metric_names
 
-        plot_epochs_data(
-            self.train_logs,
-            logs_path=logs_path,
-            show_metrics=show_metrics,
-            metric_names=metric_names
-        )
+        # Если логи не были сохранены в объекте, пробуем загрузить из файла
+        if self.train_logs is None and logs_path:
+            plot_epochs_data(
+                self.train_logs,
+                logs_path=logs_path,
+                show_metrics=show_metrics,
+                metric_names=metric_names
+            )
+        else:
+            raise FileNotFoundError(f"Файл модели не найден: {logs_path}")
 
     def predict_single(
             self,
@@ -246,6 +247,9 @@ class LazyNet:
             save_mask_path: str = None
     ):
         """Предсказание для одного изображения."""
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована. Невозможно выполнить предсказание.")
+
         self.model.eval()
 
         image_rgb, input_tensor, original_size = preprocess_image_for_model(
@@ -286,6 +290,9 @@ class LazyNet:
             viz_suffix: str = '_viz'
     ):
         """Пакетное предсказание для всех изображений в папке."""
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована. Невозможно выполнить предсказание.")
+
         self.model.eval()
 
         masks_dir = os.path.join(output_dir, 'masks') if save_masks else None
