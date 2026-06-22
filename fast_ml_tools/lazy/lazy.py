@@ -36,6 +36,7 @@ class LazyNet:
             self,
             model_name: str,
             model_path: str = None,
+            model = None,
             loss_name: str = None,
             train_img_dirs: list[str] = None,
             train_mask_dirs: list[str] = None,
@@ -61,13 +62,14 @@ class LazyNet:
         self.model_path = model_path
         self.mask_suffix = mask_suffix
 
-        # 1. Инициализация модели
-        if model_name is None and model_path is not None:
-            raise ValueError("Необходимо указать model_name.")
-        if model_name not in MODEL_FACTORIES:
-            raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {self.available_models}")
-
-        self.model = MODEL_FACTORIES[model_name](classes=classes)
+        if model is not None:
+            self.model = model
+        elif model_name is not None:
+            if model_name not in MODEL_FACTORIES:
+                raise ValueError(f"Неизвестная модель: {model_name}. Доступны: {self.available_models}")
+            self.model = MODEL_FACTORIES[model_name](classes=classes)
+        else:
+            raise ValueError("Необходимо указать либо model, либо model_name.")
 
         if model_path:
             self.load_weights(model_path)
