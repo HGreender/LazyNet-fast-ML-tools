@@ -228,7 +228,7 @@ class LazyNet:
             metric_names = self.metric_names
 
         # Если логи не были сохранены в объекте, пробуем загрузить из файла
-        if self.train_logs is None and logs_path:
+        if self.train_logs is not None or logs_path:
             plot_epochs_data(
                 self.train_logs,
                 logs_path=logs_path,
