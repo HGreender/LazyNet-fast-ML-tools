@@ -113,9 +113,16 @@ class Trainer:
                     # Для DiceScore с input_format="index" подаем подготовленные индексы
                     if isinstance(metric, __import__('torchmetrics.segmentation', fromlist=['DiceScore']).DiceScore):
                         metric.update(pred_indices, target_indices)
+                    # Для BinaryAUROC нужны вероятности и плоские тензоры
+                    elif isinstance(metric, __import__('torchmetrics.classification',
+                                                       fromlist=['BinaryAUROC']).BinaryAUROC):
+                        # Убираем размерность канала [B, 1, H, W] -> [B, H, W]
+                        probs_flat = probs.squeeze(1)  # Вероятности после sigmoid
+                        targets_flat = masks.squeeze(1).long()
+                        metric.update(probs_flat, targets_flat)
+
                     else:
-                        # Для BinaryJaccardIndex и других метрик, которые могут принимать сырые данные
-                        # оставляем оригинальные tensors или адаптируем под них при необходимости
+                        # Для BinaryJaccardIndex и других
                         metric.update(outputs, masks)
 
                 num_batches += 1
