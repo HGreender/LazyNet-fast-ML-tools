@@ -21,13 +21,13 @@ def plot_epochs_data(
         metric_names: Список конкретных имен метрик для отображения.
                       Если None, отображаются все найденные метрики.
     """
-    # 1. Загрузка данных
-    if epoch_data is None:
-        epoch_logger = EpochsLogger()
-        if not epoch_logger.load_logs_json(logs_path):
-            print("Не удалось загрузить логи для визуализации")
-            return
+    epoch_logger = EpochsLogger()
+    if epoch_logger.load_logs_json(logs_path):
         epoch_data = epoch_logger.epoch_logs
+    elif epoch_data is None:
+        print("Не удалось загрузить логи для визуализации")
+        return
+
 
     epochs = epoch_data.epochs
     train_losses = epoch_data.train_losses
