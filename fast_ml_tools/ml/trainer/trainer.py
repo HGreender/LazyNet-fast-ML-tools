@@ -100,7 +100,7 @@ class Trainer:
 
                 # 2. Подготавливаем Preds (предсказания)
                 # Сначала получаем вероятности (если outputs - это логиты)
-                probs = torch.sigmoid(outputs) if outputs.min() < 0 else outputs
+                probs = torch.sigmoid(outputs)
 
                 # Бинаризуем по порогу 0.5, получаем 0 или 1
                 pred_indices = (probs > 0.5).long()

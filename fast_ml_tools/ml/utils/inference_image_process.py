@@ -27,19 +27,19 @@ def preprocess_image_for_model(
 def postprocess_prediction(
         output_tensor: torch.Tensor,
         threshold: float = 0.5,
-        original_size: tuple[int, int] = None
-) -> np.ndarray:
-    """
-    Преобразует выход модели в бинарную маску и ресайзит её обратно.
-    """
-    pred_mask = output_tensor.squeeze().cpu().numpy()
-    binary_mask = (pred_mask > threshold).astype(np.uint8)
-
-    # Если маска 2D (H, W), добавляем канал для корректного ресайза в OpenCV, если нужно
-    # Но cv2.resize отлично работает с 2D массивами
+        original_size: tuple[int, int] = None,
+        return_probabilities: bool = False
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    probabilities = torch.sigmoid(output_tensor)
+    pred_mask = probabilities.squeeze().cpu().numpy()
 
     if original_size is not None:
-        # original_size это (W, H)
-        binary_mask = cv2.resize(binary_mask, original_size, interpolation=cv2.INTER_NEAREST)
+        prob_resized = cv2.resize(pred_mask, original_size, interpolation=cv2.INTER_LINEAR)
+        binary_mask = (prob_resized > threshold).astype(np.uint8)
+    else:
+        binary_mask = (pred_mask > threshold).astype(np.uint8)
+        prob_resized = pred_mask
 
+    if return_probabilities:
+        return binary_mask, prob_resized
     return binary_mask

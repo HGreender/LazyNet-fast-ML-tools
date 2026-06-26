@@ -244,7 +244,8 @@ class LazyNet:
             threshold: float = 0.5,
             visualize: bool = True,
             save_concat_path: str = None,
-            save_mask_path: str = None
+            save_mask_path: str = None,
+            return_probabilities: bool = False
     ):
         """Предсказание для одного изображения."""
         if self.model is None:
@@ -261,7 +262,12 @@ class LazyNet:
         with torch.no_grad():
             output = self.model(input_tensor)
 
-        binary_mask = postprocess_prediction(output, threshold, original_size=original_size)
+        binary_mask = postprocess_prediction(
+            output,
+            threshold,
+            original_size=original_size,
+            return_probabilities=return_probabilities
+        )
 
         if save_mask_path:
             os.makedirs(os.path.dirname(save_mask_path) or '.', exist_ok=True)
