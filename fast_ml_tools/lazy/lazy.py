@@ -195,8 +195,8 @@ class LazyNet:
 
     def fit(
             self,
-            save_model_path: str = './lazy/models/best_model.pth',
-            save_logs_path: str = './lazy/logs/training_logs.json',
+            save_model_path: str = './lazy_data/models/best_model.pth',
+            save_logs_path: str = './lazy_data/logs/training_logs.json',
             save_checkpoint_path: str = None,
             load_checkpoint_path: str = None
     ):
@@ -287,7 +287,7 @@ class LazyNet:
     def predict_folder(
             self,
             input_dir: str,
-            output_dir: str = './lazy/predictions/',
+            output_dir: str = './lazy_data/predictions/',
             threshold: float = 0.5,
             save_masks: bool = True,
             save_concat: bool = True,
