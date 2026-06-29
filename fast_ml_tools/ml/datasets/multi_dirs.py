@@ -11,6 +11,7 @@ class MultiDirsDataset(Dataset):
     """
     Датасет для работы с несколькими папками изображений и масок.
     Собирает все валидные пары изображение-маска из всех указанных папок.
+    Поддерживает несколько суффиксов для масок.
     """
 
     def __init__(
@@ -18,21 +19,22 @@ class MultiDirsDataset(Dataset):
         img_dirs: list[str],
         mask_dirs: list[str],
         augmentation=None,
-        mask_suffix: str = ""
+        mask_suffix: str | list[str] = ""
     ):
         """
         Args:
             img_dirs: Список путей к папкам с изображениями
             mask_dirs: Список путей к папкам с масками (должен быть той же длины, что и img_dirs)
             augmentation: Функция аугментации (опционально)
-            mask_suffix: Постфикс для имени файла маски (например, "_mask" для img123_mask.png)
+            mask_suffix: Постфикс для имени файла маски (str или list[str]).
+                         Например, "_mask" или ["_mask", "_seg", ""]
         """
         if len(img_dirs) != len(mask_dirs):
             raise ValueError(f"Количество папок с изображениями ({len(img_dirs)}) "
                              f"не совпадает с количеством папок с масками ({len(mask_dirs)})")
 
         self.augmentation = augmentation
-        self.mask_suffix = mask_suffix
+        self.mask_suffixes = _normalize_mask_suffix(mask_suffix)
         self.samples = []  # Список кортежей (img_path, mask_path)
 
         # Собираем все валидные пары из всех папок
@@ -50,11 +52,10 @@ class MultiDirsDataset(Dataset):
 
             for img_name in all_imgs:
                 name_without_ext = os.path.splitext(img_name)[0]
-                # Формируем имя маски с учетом суффикса
-                mask_name = f"{name_without_ext}{self.mask_suffix}.png"
-                mask_path = os.path.join(mask_dir, mask_name)
+                # Ищем маску с любым из указанных суффиксов
+                mask_path = _find_mask_file(mask_dir, name_without_ext, self.mask_suffixes)
 
-                if os.path.exists(mask_path):
+                if mask_path:
                     img_path = os.path.join(img_dir, img_name)
                     self.samples.append((img_path, mask_path))
 
@@ -178,7 +179,7 @@ def create_train_val_datasets_from_multiple_dirs(
         seed: int = 42,
         train_augmentation=None,
         val_augmentation=None,
-        mask_suffix: str = ""
+        mask_suffix: str | list[str] = ""
 ) -> tuple[MultiDirsDatasetFromSamples, MultiDirsDatasetFromSamples]:
     """
     Создаёт тренировочный и валидационный датасеты из нескольких папок с изображениями и масками.
@@ -190,7 +191,8 @@ def create_train_val_datasets_from_multiple_dirs(
         seed: Seed для воспроизводимости разбиения
         train_augmentation: Функция аугментации для train-датасета
         val_augmentation: Функция аугментации для val-датасета
-        mask_suffix: Постфикс для имени файла маски (например, "_mask" для img123_mask.png)
+        mask_suffix: Постфикс для имени файла маски (str или list[str]).
+                     Например, "_mask" или ["_mask", "_seg", ""]
 
     Returns:
         Кортеж (train_dataset, val_dataset)
@@ -198,6 +200,9 @@ def create_train_val_datasets_from_multiple_dirs(
     if len(img_dirs) != len(mask_dirs):
         raise ValueError(f"Количество папок с изображениями ({len(img_dirs)}) "
                          f"не совпадает с количеством папок с масками ({len(mask_dirs)})")
+
+    # Нормализуем суффиксы к списку
+    mask_suffixes = _normalize_mask_suffix(mask_suffix)
 
     # Собираем все валидные пары из всех папок
     all_samples = []  # Список кортежей (img_path, mask_path)
@@ -218,10 +223,10 @@ def create_train_val_datasets_from_multiple_dirs(
 
         for img_name in all_imgs:
             name_without_ext = os.path.splitext(img_name)[0]
-            mask_name = f"{name_without_ext}{mask_suffix}.png"
-            mask_path = os.path.join(mask_dir, mask_name)
+            # Ищем маску с любым из указанных суффиксов
+            mask_path = _find_mask_file(mask_dir, name_without_ext, mask_suffixes)
 
-            if os.path.exists(mask_path):
+            if mask_path:
                 img_path = os.path.join(img_dir, img_name)
                 all_samples.append((img_path, mask_path))
             else:
@@ -254,3 +259,26 @@ def create_train_val_datasets_from_multiple_dirs(
     )
 
     return train_dataset, val_dataset
+
+
+def _normalize_mask_suffix(mask_suffix):
+    """Нормализует mask_suffix к списку строк."""
+    if isinstance(mask_suffix, str):
+        return [mask_suffix] if mask_suffix else [""]
+    elif isinstance(mask_suffix, (list, tuple)):
+        return list(mask_suffix) if mask_suffix else [""]
+    else:
+        raise ValueError(f"mask_suffix должен быть str или list[str], получен {type(mask_suffix)}")
+
+
+def _find_mask_file(mask_dir: str, base_name: str, mask_suffixes: list[str]) -> str | None:
+    """
+    Ищет файл маски в директории по базовому имени и списку суффиксов.
+    Возвращает путь к первой найденной маске или None.
+    """
+    for suffix in mask_suffixes:
+        mask_name = f"{base_name}{suffix}.png"
+        mask_path = os.path.join(mask_dir, mask_name)
+        if os.path.exists(mask_path):
+            return mask_path
+    return None

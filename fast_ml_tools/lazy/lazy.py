@@ -41,7 +41,7 @@ class LazyNet:
             train_mask_dirs: list[str] = None,
             val_img_dirs: list[str] = None,
             val_mask_dirs: list[str] = None,
-            mask_suffix: str = "",
+            mask_suffix: str | list[str] = "_mask",  # Теперь принимает str или list[str]
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
             early_stopping_threshold = 10,
@@ -98,7 +98,7 @@ class LazyNet:
                     seed=train_val_seed,
                     train_augmentation=self.train_augmentation,
                     val_augmentation=self.val_augmentation,
-                    mask_suffix=mask_suffix
+                    mask_suffix=self.mask_suffix  # Передаем список суффиксов
                 )
             else:
                 if len(val_img_dirs) != len(val_mask_dirs):
@@ -108,13 +108,13 @@ class LazyNet:
                     img_dirs=train_img_dirs,
                     mask_dirs=train_mask_dirs,
                     augmentation=self.train_augmentation,
-                    mask_suffix=mask_suffix
+                    mask_suffix=self.mask_suffix  # Передаем список суффиксов
                 )
                 self.val_dataset = MultiDirsDataset(
                     img_dirs=val_img_dirs,
                     mask_dirs=val_mask_dirs,
                     augmentation=self.val_augmentation,
-                    mask_suffix=mask_suffix
+                    mask_suffix=self.mask_suffix  # Передаем список суффиксов
                 )
 
             if self.train_dataset:
