@@ -53,7 +53,6 @@ def show_segmentation(image_rgb, binary_mask, save_path=None, is_show = True):
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path)
-        print(f"Visualization saved to {save_path}")
 
     if is_show:
         plt.show()
