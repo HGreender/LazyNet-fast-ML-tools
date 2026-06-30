@@ -3,6 +3,7 @@ from tqdm import tqdm
 import cv2
 import torch
 from torch.utils.data import DataLoader
+import optuna
 
 from fast_ml_tools.ml.datasets import create_train_val_datasets_from_multiple_dirs, MultiDirsDataset
 from fast_ml_tools.ml.models import efficientnetb4_unet, efficientnetb4_unetpp
@@ -41,7 +42,7 @@ class LazyNet:
             train_mask_dirs: list[str] = None,
             val_img_dirs: list[str] = None,
             val_mask_dirs: list[str] = None,
-            mask_suffix: str | list[str] = "_mask",  # Теперь принимает str или list[str]
+            mask_suffix: str | list[str] = "_mask",
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
             early_stopping_threshold = 10,
@@ -50,6 +51,7 @@ class LazyNet:
             lr: float = 1e-4,
             lr_patience: int = 8,
             lr_factor: float = 0.1,
+            weight_decay: float = 1e-4,
             verbose: bool = True,
             device_id: int = 0,
             num_workers: int = 0,
@@ -98,7 +100,7 @@ class LazyNet:
                     seed=train_val_seed,
                     train_augmentation=self.train_augmentation,
                     val_augmentation=self.val_augmentation,
-                    mask_suffix=self.mask_suffix  # Передаем список суффиксов
+                    mask_suffix=self.mask_suffix
                 )
             else:
                 if len(val_img_dirs) != len(val_mask_dirs):
@@ -108,13 +110,13 @@ class LazyNet:
                     img_dirs=train_img_dirs,
                     mask_dirs=train_mask_dirs,
                     augmentation=self.train_augmentation,
-                    mask_suffix=self.mask_suffix  # Передаем список суффиксов
+                    mask_suffix=self.mask_suffix
                 )
                 self.val_dataset = MultiDirsDataset(
                     img_dirs=val_img_dirs,
                     mask_dirs=val_mask_dirs,
                     augmentation=self.val_augmentation,
-                    mask_suffix=self.mask_suffix  # Передаем список суффиксов
+                    mask_suffix=self.mask_suffix
                 )
 
             if self.train_dataset:
@@ -143,35 +145,60 @@ class LazyNet:
 
         # Трейнер создаем только если есть модель, данные и лосс
         if self.model is not None and self.train_loader and loss_name:
-            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
-
-            if loss_name not in LOSS_FACTORIES:
-                raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {self.available_losses}")
-            self.loss_fn = LOSS_FACTORIES[loss_name]()
-
-            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                self.optimizer,
-                mode='min',
-                factor=lr_factor,
-                patience=lr_patience
-            )
-
-            metrics = get_segmentation_metrics(metric_names)
-
-            self.trainer = Trainer(
-                model=self.model,
-                train_loader=self.train_loader,
-                val_loader=self.val_loader,
-                optimizer=self.optimizer,
-                loss_fn=self.loss_fn,
+            self._init_optimizer_scheduler_trainer(
+                lr=lr,
+                weight_decay=weight_decay,
+                lr_patience=lr_patience,
+                lr_factor=lr_factor,
+                loss_name=loss_name,
                 early_stopping_threshold=early_stopping_threshold,
-                metrics=metrics,
-                scheduler=self.scheduler,
-                device=self.device,
-                verbose=self.verbose,
+                metric_names=metric_names
             )
 
         self.train_logs = None
+
+    def _init_optimizer_scheduler_trainer(
+            self,
+            lr: float,
+            weight_decay: float,
+            lr_patience: int,
+            lr_factor: float,
+            loss_name: str,
+            early_stopping_threshold: int,
+            metric_names: list = None
+    ):
+        """Вспомогательный метод для инициализации оптимизатора, scheduler и trainer"""
+        self.optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay
+        )
+
+        if loss_name not in LOSS_FACTORIES:
+            raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {self.available_losses}")
+        self.loss_fn = LOSS_FACTORIES[loss_name]()
+
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer,
+            mode='min',
+            factor=lr_factor,
+            patience=lr_patience
+        )
+
+        metrics = get_segmentation_metrics(metric_names)
+
+        self.trainer = Trainer(
+            model=self.model,
+            train_loader=self.train_loader,
+            val_loader=self.val_loader,
+            optimizer=self.optimizer,
+            loss_fn=self.loss_fn,
+            early_stopping_threshold=early_stopping_threshold,
+            metrics=metrics,
+            scheduler=self.scheduler,
+            device=self.device,
+            verbose=self.verbose,
+        )
 
     @property
     def available_models(self) -> list[str]:
@@ -218,6 +245,46 @@ class LazyNet:
 
         self.model_path = save_model_path
 
+    def fit_with_optuna(
+            self,
+            trial,
+            save_dir: str = './optuna_trials',
+            epochs: int = None
+    ):
+        """
+        Метод для обучения с поддержкой Optuna pruning.
+        Возвращает лучший val_loss для минимизации.
+        """
+        if self.trainer is None:
+            raise RuntimeError(
+                "Невозможно запустить fit_with_optuna(): не инициализирован Trainer."
+            )
+
+        # Создаем директорию для trial
+        trial_dir = os.path.join(save_dir, f'trial_{trial.number}')
+        os.makedirs(trial_dir, exist_ok=True)
+
+        save_model_path = os.path.join(trial_dir, 'best_model.pth')
+        save_logs_path = os.path.join(trial_dir, 'logs.json')
+
+        # Обучаем с передачей trial для pruning
+        self.train_logs = self.trainer.fit(
+            epochs=epochs or self.epochs,
+            save_path=save_model_path,
+            log_path=save_logs_path,
+            optuna_trial=trial
+        )
+
+        # --- ИЗВЛЕЧЕНИЕ ЛУЧШЕГО VAL LOSS ---
+        best_val_loss = float('inf')
+
+        if self.train_logs and hasattr(self.train_logs, 'val_losses'):
+            # self.train_logs.val_losses - это список чисел (float)
+            if self.train_logs.val_losses:
+                best_val_loss = min(self.train_logs.val_losses)
+
+        return best_val_loss
+
     def draw_logs(
             self,
             logs_path: str = None,
@@ -227,7 +294,6 @@ class LazyNet:
         if metric_names is None:
             metric_names = self.metric_names
 
-        # Если логи не были сохранены в объекте, пробуем загрузить из файла
         if self.train_logs is not None or logs_path:
             plot_epochs_data(
                 self.train_logs,

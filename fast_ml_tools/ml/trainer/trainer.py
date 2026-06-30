@@ -2,6 +2,7 @@ import os
 import torch
 from tqdm import tqdm
 from fast_ml_tools.logging import EpochsLogger
+import optuna
 
 
 class Trainer:
@@ -37,6 +38,8 @@ class Trainer:
 
         self.best_loss = float('inf')
         self.current_epoch = 0
+
+        self.optuna_trial = None
 
     def train_epoch(self):
         """Одна эпоха обучения"""
@@ -120,9 +123,7 @@ class Trainer:
                         probs_flat = probs.squeeze(1)  # Вероятности после sigmoid
                         targets_flat = masks.squeeze(1).long()
                         metric.update(probs_flat, targets_flat)
-
                     else:
-                        # Для BinaryJaccardIndex и других
                         metric.update(outputs, masks)
 
                 num_batches += 1
@@ -193,9 +194,12 @@ class Trainer:
             save_path='./models/best_model.pth',
             log_path='./logs/training_logs.json',
             save_checkpoint_path = None,
-            resume_from = None
+            resume_from = None,
+            optuna_trial=None
     ):
         """Основной цикл тренировки"""
+        self.optuna_trial = optuna_trial
+
         if resume_from:
             self.load_checkpoint(resume_from)
             if self.logger.load_logs_json(log_path):
@@ -254,6 +258,12 @@ class Trainer:
                 metrics=val_metrics,
                 path=log_path
             )
+
+            if self.optuna_trial is not None:
+                self.optuna_trial.report(val_loss, epoch)
+
+                if self.optuna_trial.should_prune():
+                    raise optuna.exceptions.TrialPruned()
 
         print(f"Training finished. Best Val Loss: {self.best_loss:.4f}")
         return self.logger.epoch_logs
