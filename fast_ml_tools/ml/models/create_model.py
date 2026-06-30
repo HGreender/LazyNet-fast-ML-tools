@@ -9,9 +9,10 @@ def efficientnetb4_unet(classes: list = ['target_class'], activation: str | None
     model = smp.Unet(
         encoder_name='efficientnet-b4',
         encoder_weights='imagenet',
+        decoder_attention_type="scse",
         classes=len(classes),
         activation=activation,
-        decoder_channels=(256, 128, 64, 32, 16), # Стандарт для тяжелых энкодеров
+        decoder_channels=(256, 128, 64, 32, 16),
     )
     return model
 
@@ -24,8 +25,9 @@ def efficientnetb4_unetpp(classes: list = ['target_class'], activation: str | No
     model = smp.UnetPlusPlus(
         encoder_name='efficientnet-b4',
         encoder_weights='imagenet',
+        decoder_attention_type="scse",
         classes=len(classes),
         activation=activation,
-        decoder_channels=(256, 128, 64, 32, 16), # Стандарт для тяжелых энкодеров
+        decoder_channels=(256, 128, 64, 32, 16),
     )
     return model
