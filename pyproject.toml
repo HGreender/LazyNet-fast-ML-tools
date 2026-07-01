@@ -41,6 +41,8 @@ viz = [
     "opencv-python>=4.10.0",
     "opencv-python-headless>=4.10.0",
     "pillow>=10.0.0",
+    "plotly>=5.24.0",
+    "nbformat>=5.10.0",
 ]
 
 # 3. ML модели и аугментации
