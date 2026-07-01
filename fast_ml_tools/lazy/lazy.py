@@ -3,7 +3,6 @@ from tqdm import tqdm
 import cv2
 import torch
 from torch.utils.data import DataLoader
-import optuna
 
 from fast_ml_tools.ml.datasets import create_train_val_datasets_from_multiple_dirs, MultiDirsDataset
 from fast_ml_tools.ml.models import efficientnetb4_unet, efficientnetb4_unetpp
