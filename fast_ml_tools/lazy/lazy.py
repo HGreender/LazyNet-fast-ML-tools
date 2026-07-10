@@ -2,6 +2,7 @@ import os
 from tqdm import tqdm
 import cv2
 import torch
+import numpy as np
 from torch.utils.data import DataLoader
 
 from fast_ml_tools.ml.datasets import create_train_val_datasets_from_multiple_dirs, MultiDirsDataset
@@ -35,7 +36,7 @@ class LazyNet:
             self,
             model_name: str = None,
             model_path: str = None,
-            model = None,
+            model=None,
             loss_name: str = None,
             train_img_dirs: list[str] = None,
             train_mask_dirs: list[str] = None,
@@ -44,7 +45,7 @@ class LazyNet:
             mask_suffix: str | list[str] = "_mask",
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
-            early_stopping_threshold = 10,
+            early_stopping_threshold=10,
             epochs: int = 100,
             batch_size: int = 1,
             lr: float = 1e-4,
@@ -349,6 +350,134 @@ class LazyNet:
 
         return binary_mask
 
+    def visualize_heatmap_contours(
+            self,
+            image_path: str,
+            min_threshold: float = 1e-5,
+            save_path: str = None,
+            is_show: bool = True,
+            class_idx: int = 0
+    ):
+        """
+        Визуализирует все контуры патологии и подписывает диапазон их активации.
+        Текст автоматически корректируется, чтобы не выходить за границы изображения.
+        """
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована.")
+
+        self.model.eval()
+        image_rgb, input_tensor, original_size = preprocess_image_for_model(
+            image_path,
+            self.val_augmentation,
+            self.device
+        )
+
+        # Получаем карту вероятностей
+        with torch.no_grad():
+            output = self.model(input_tensor)
+
+        num_channels = output.shape[1]
+        if num_channels == 1:
+            prob_map_raw = torch.sigmoid(output).squeeze().cpu().numpy()
+        else:
+            probs = torch.softmax(output, dim=1)
+            prob_map_raw = probs[:, class_idx, :, :].squeeze().cpu().numpy()
+
+        # Ресайзим до оригинального размера
+        prob_map = cv2.resize(prob_map_raw, original_size, interpolation=cv2.INTER_LINEAR)
+        h, w = prob_map.shape
+
+        vis_img = image_rgb.copy()
+
+        # Находим все связные компоненты выше min_threshold
+        binary_mask = (prob_map >= min_threshold).astype(np.uint8)
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_mask, connectivity=8)
+
+        print(f"Найдено {num_labels - 1} компонент(ов) выше порога {min_threshold}")
+
+        # Цвета для различения компонентов
+        colors = [
+            (0, 255, 0),  # Зеленый
+            (255, 0, 0),  # Синий
+            (0, 0, 255),  # Красный
+            (0, 255, 255),  # Желтый
+            (255, 0, 255),  # Маджента
+            (255, 255, 0),  # Циан
+        ]
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.35  # Уменьшенный шрифт
+        thickness = 1
+
+        for label in range(1, num_labels):  # Пропускаем фон (label=0)
+            component_mask = (labels == label).astype(np.uint8)
+
+            # Вычисляем min и max вероятности ВНУТРИ этого компонента
+            component_probs = prob_map[component_mask > 0]
+            p_min = component_probs.min()
+            p_max = component_probs.max()
+
+            # Находим контур компонента
+            contours, _ = cv2.findContours(component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            color = colors[(label - 1) % len(colors)]
+
+            # Рисуем контур
+            cv2.drawContours(vis_img, contours, -1, color, 2)
+
+            # Формируем подпись
+            text = f"{p_min:.5f}-{p_max:.3f}"
+
+            # Определяем начальную позицию рядом с центроидом
+            cx, cy = centroids[label]
+            start_x = int(cx) + 5
+            start_y = int(cy) - 5
+
+            # --- ЛОГИКА ОГРАНИЧЕНИЯ ТЕКСТА В РАМКАХ ИЗОБРАЖЕНИЯ ---
+            (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+
+            # Корректировка по X (чтобы не уходило за правый край)
+            if start_x + text_w > w:
+                start_x = w - text_w - 2
+
+            # Корректировка по Y (чтобы не уходило за нижний край)
+            # text_h измеряется от базовой линии вверх, но нам нужно учесть и baseline
+            if start_y + baseline > h:
+                start_y = h - baseline - 2
+
+            # Дополнительная проверка, чтобы текст не уходил за левый/верхний край при сильном сдвиге
+            start_x = max(2, start_x)
+            start_y = max(text_h + 2, start_y)
+
+            text_pos = (start_x, start_y)
+
+            # Рисуем тень (черная подложка) для читаемости
+            cv2.putText(vis_img, text, text_pos, font, font_scale, (0, 0, 0), thickness + 2, cv2.LINE_AA)
+            # Рисуем основной текст
+            cv2.putText(vis_img, text, text_pos, font, font_scale, color, thickness, cv2.LINE_AA)
+
+        if save_path:
+            if not os.path.splitext(save_path)[1]:
+                save_path += '.png'
+            os.makedirs(os.path.dirname(save_path) or '.', exist_ok=True)
+            cv2.imwrite(save_path, cv2.cvtColor(vis_img, cv2.COLOR_RGB2BGR))
+            print(f"Визуализация сохранена в {save_path}")
+
+        if is_show:
+            try:
+                cv2.imshow('Heatmap Contours Visualization', cv2.cvtColor(vis_img, cv2.COLOR_RGB2BGR))
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+            except Exception:
+                import matplotlib.pyplot as plt
+                plt.figure(figsize=(12, 12))
+                plt.imshow(vis_img)
+                plt.title(f'Contours & Activation Ranges (thr >= {min_threshold})')
+                plt.axis('off')
+                plt.show()
+
+        return vis_img
+
     def predict_folder(
             self,
             input_dir: str,
@@ -393,6 +522,118 @@ class LazyNet:
                     save_concat_path=os.path.join(concat_dir, f"{name}{viz_suffix}{ext}") if concat_dir else None,
                     save_mask_path=os.path.join(masks_dir, f"{name}{mask_suffix}.png") if masks_dir else None
                 )
+            except Exception as e:
+                print(f"Ошибка при обработке {filename}: {e}")
+
+        print(f"Готово! Результаты сохранены в {output_dir}")
+
+    def visualize_folder_heatmaps(
+            self,
+            input_dir: str,
+            output_dir: str = './lazy_data/heatmap_viz/',
+            min_threshold: float = 1e-5,
+            class_idx: int = 0,
+            save_contours_only: bool = False
+    ):
+        """
+        Пакетная визуализация тепловых карт и контуров для всех изображений в папке.
+
+        Args:
+            input_dir: Папка с исходными изображениями.
+            output_dir: Папка для сохранения результатов.
+            min_threshold: Минимальный порог чувствительности.
+            class_idx: Индекс класса патологии.
+            save_contours_only: Если True, сохраняет только изображение с разметкой (без оригинала рядом).
+        """
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована.")
+
+        self.model.eval()
+        os.makedirs(output_dir, exist_ok=True)
+
+        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tif')
+        files = [f for f in os.listdir(input_dir) if f.lower().endswith(valid_extensions)]
+
+        if not files:
+            print(f"В папке {input_dir} не найдено изображений.")
+            return
+
+        print(f"Начинаю пакетную обработку {len(files)} изображений...")
+
+        for filename in tqdm(files, desc="Processing Heatmaps"):
+            img_path = os.path.join(input_dir, filename)
+            name, ext = os.path.splitext(filename)
+
+            try:
+                # Получаем данные через уже написанный препроцессинг
+                image_rgb, input_tensor, original_size = preprocess_image_for_model(
+                    img_path,
+                    self.val_augmentation,
+                    self.device
+                )
+
+                with torch.no_grad():
+                    output = self.model(input_tensor)
+
+                num_channels = output.shape[1]
+                if num_channels == 1:
+                    prob_map_raw = torch.sigmoid(output).squeeze().cpu().numpy()
+                else:
+                    probs = torch.softmax(output, dim=1)
+                    prob_map_raw = probs[:, class_idx, :, :].squeeze().cpu().numpy()
+
+                prob_map = cv2.resize(prob_map_raw, original_size, interpolation=cv2.INTER_LINEAR)
+                h, w = prob_map.shape
+
+                vis_img = image_rgb.copy()
+
+                binary_mask = (prob_map >= min_threshold).astype(np.uint8)
+                num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_mask, connectivity=8)
+
+                colors = [
+                    (0, 255, 0), (255, 0, 0), (0, 0, 255),
+                    (0, 255, 255), (255, 0, 255), (255, 255, 0)
+                ]
+
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.35
+                thickness = 1
+
+                for label in range(1, num_labels):
+                    component_mask = (labels == label).astype(np.uint8)
+                    component_probs = prob_map[component_mask > 0]
+
+                    if component_probs.size == 0: continue
+
+                    p_min = component_probs.min()
+                    p_max = component_probs.max()
+
+                    contours, _ = cv2.findContours(component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    color = colors[(label - 1) % len(colors)]
+
+                    cv2.drawContours(vis_img, contours, -1, color, 2)
+
+                    text = f"{p_min:.5f}-{p_max:.3f}"
+                    cx, cy = centroids[label]
+                    start_x = int(cx) + 5
+                    start_y = int(cy) - 5
+
+                    (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+
+                    if start_x + text_w > w: start_x = w - text_w - 2
+                    if start_y + baseline > h: start_y = h - baseline - 2
+                    start_x = max(2, start_x)
+                    start_y = max(text_h + 2, start_y)
+
+                    text_pos = (start_x, start_y)
+                    cv2.putText(vis_img, text, text_pos, font, font_scale, (0, 0, 0), thickness + 2, cv2.LINE_AA)
+                    cv2.putText(vis_img, text, text_pos, font, font_scale, color, thickness, cv2.LINE_AA)
+
+                # Сохранение результата
+                save_name = f"{name}_viz{ext}"
+                save_path = os.path.join(output_dir, save_name)
+                cv2.imwrite(save_path, cv2.cvtColor(vis_img, cv2.COLOR_RGB2BGR))
+
             except Exception as e:
                 print(f"Ошибка при обработке {filename}: {e}")
 
