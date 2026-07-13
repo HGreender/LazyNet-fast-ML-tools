@@ -398,7 +398,6 @@ class LazyNet:
         # Цвета для различения компонентов
         colors = [
             (0, 255, 0),  # Зеленый
-            (255, 0, 0),  # Синий
             (0, 0, 255),  # Красный
             (0, 255, 255),  # Желтый
             (255, 0, 255),  # Маджента
@@ -591,7 +590,7 @@ class LazyNet:
                 num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_mask, connectivity=8)
 
                 colors = [
-                    (0, 255, 0), (255, 0, 0), (0, 0, 255),
+                    (0, 255, 0), (0, 0, 255),
                     (0, 255, 255), (255, 0, 255), (255, 255, 0)
                 ]
 
