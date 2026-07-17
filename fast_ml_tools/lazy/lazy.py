@@ -12,7 +12,7 @@ from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss, DiceFocalLoss, IoUFocalLoss
 from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
-from fast_ml_tools.ml.utils import preprocess_image_for_model, postprocess_prediction, get_device
+from fast_ml_tools.ml.utils import preprocess_image_array_for_model, postprocess_prediction, get_device
 
 MODEL_FACTORIES = {
     'efficientnetb4_unet': efficientnetb4_unet,
@@ -304,6 +304,63 @@ class LazyNet:
         else:
             raise FileNotFoundError(f"Файл модели не найден: {logs_path}")
 
+    def _predict_mask(
+            self,
+            image_rgb: np.ndarray,
+            threshold: float = 0.5,
+            return_probabilities: bool = False,
+            class_idx: int = 0
+    ):
+        """
+        Внутренний метод для получения маски и вероятностей из numpy array.
+
+        Args:
+            image_rgb: Изображение в формате RGB (H, W, C)
+            threshold: Порог для бинаризации
+            return_probabilities: Вернуть ли карту вероятностей
+            class_idx: Индекс класса для многоклассовой модели
+
+        Returns:
+            tuple: (binary_mask, prob_map_resized, original_size)
+        """
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована. Невозможно выполнить предсказание.")
+
+        self.model.eval()
+
+        # Препроцессинг изображения
+        input_tensor, original_size = preprocess_image_array_for_model(
+            image_rgb,
+            self.val_augmentation,
+            self.device
+        )
+
+        with torch.no_grad():
+            output = self.model(input_tensor)
+
+        # Получаем карту вероятностей до постпроцессинга
+        num_channels = output.shape[1]
+        if num_channels == 1:
+            prob_map_raw = torch.sigmoid(output).squeeze().cpu().numpy()
+        else:
+            probs = torch.softmax(output, dim=1)
+            prob_map_raw = probs[:, class_idx, :, :].squeeze().cpu().numpy()
+
+        # Ресайзим карту вероятностей до оригинального размера
+        prob_map_resized = cv2.resize(prob_map_raw, original_size, interpolation=cv2.INTER_LINEAR)
+
+        # Получаем бинарную маску через существующую функцию
+        binary_mask = postprocess_prediction(
+            output,
+            threshold,
+            original_size=original_size,
+            return_probabilities=False  # Мы сами работаем с prob_map_resized
+        )
+
+        if return_probabilities:
+            return binary_mask, prob_map_resized, original_size
+        return binary_mask, None, original_size
+
     def predict_single(
             self,
             image_path: str,
@@ -314,25 +371,16 @@ class LazyNet:
             return_probabilities: bool = False
     ):
         """Предсказание для одного изображения."""
-        if self.model is None:
-            raise RuntimeError("Модель не инициализирована. Невозможно выполнить предсказание.")
+        # Загружаем изображение
+        image_cv = cv2.imread(image_path)
+        if image_cv is None:
+            raise FileNotFoundError(f"Не удалось прочитать изображение: {image_path}")
+        image_rgb = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
 
-        self.model.eval()
-
-        image_rgb, input_tensor, original_size = preprocess_image_for_model(
-            image_path,
-            self.val_augmentation,
-            self.device
-        )
-
-        with torch.no_grad():
-            output = self.model(input_tensor)
-
-        binary_mask = postprocess_prediction(
-            output,
-            threshold,
-            original_size=original_size,
-            return_probabilities=return_probabilities
+        binary_mask, prob_map, _ = self._predict_mask(
+            image_rgb=image_rgb,
+            threshold=threshold,
+            return_probabilities=True
         )
 
         if save_mask_path:
@@ -348,6 +396,35 @@ class LazyNet:
                 is_show=visualize
             )
 
+        if return_probabilities:
+            return binary_mask, prob_map
+        return binary_mask
+
+    def predict_image(
+            self,
+            image_rgb: np.ndarray,
+            threshold: float = 0.5,
+            return_probabilities: bool = False
+    ):
+        """
+        Предсказание для numpy array изображения.
+
+        Args:
+            image_rgb: Изображение в формате RGB (H, W, C)
+            threshold: Порог для бинаризации
+            return_probabilities: Вернуть ли карту вероятностей
+
+        Returns:
+            binary_mask или (binary_mask, prob_map)
+        """
+        binary_mask, prob_map, _ = self._predict_mask(
+            image_rgb=image_rgb,
+            threshold=threshold,
+            return_probabilities=True
+        )
+
+        if return_probabilities:
+            return binary_mask, prob_map
         return binary_mask
 
     def visualize_heatmap_contours(
@@ -365,28 +442,21 @@ class LazyNet:
         if self.model is None:
             raise RuntimeError("Модель не инициализирована.")
 
-        self.model.eval()
-        image_rgb, input_tensor, original_size = preprocess_image_for_model(
-            image_path,
-            self.val_augmentation,
-            self.device
+        # Загружаем изображение
+        image_cv = cv2.imread(image_path)
+        if image_cv is None:
+            raise FileNotFoundError(f"Не удалось прочитать изображение: {image_path}")
+        image_rgb = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
+
+        # Используем новый метод для получения данных
+        _, prob_map, original_size = self._predict_mask(
+            image_rgb=image_rgb,
+            threshold=0.5,  # Порог здесь не важен, т.к. мы используем prob_map
+            return_probabilities=True,
+            class_idx=class_idx
         )
 
-        # Получаем карту вероятностей
-        with torch.no_grad():
-            output = self.model(input_tensor)
-
-        num_channels = output.shape[1]
-        if num_channels == 1:
-            prob_map_raw = torch.sigmoid(output).squeeze().cpu().numpy()
-        else:
-            probs = torch.softmax(output, dim=1)
-            prob_map_raw = probs[:, class_idx, :, :].squeeze().cpu().numpy()
-
-        # Ресайзим до оригинального размера
-        prob_map = cv2.resize(prob_map_raw, original_size, interpolation=cv2.INTER_LINEAR)
-        h, w = prob_map.shape
-
+        h, w = original_size
         vis_img = image_rgb.copy()
 
         # Находим все связные компоненты выше min_threshold
@@ -413,6 +483,10 @@ class LazyNet:
 
             # Вычисляем min и max вероятности ВНУТРИ этого компонента
             component_probs = prob_map[component_mask > 0]
+
+            if component_probs.size == 0:
+                continue
+
             p_min = component_probs.min()
             p_max = component_probs.max()
 
@@ -564,26 +638,21 @@ class LazyNet:
             name, ext = os.path.splitext(filename)
 
             try:
-                # Получаем данные через уже написанный препроцессинг
-                image_rgb, input_tensor, original_size = preprocess_image_for_model(
-                    img_path,
-                    self.val_augmentation,
-                    self.device
+                # Загружаем изображение
+                image_cv = cv2.imread(img_path)
+                if image_cv is None:
+                    raise FileNotFoundError(f"Не удалось прочитать изображение: {img_path}")
+                image_rgb = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
+
+                # Теперь используем единый метод для получения данных
+                _, prob_map, original_size = self._predict_mask(
+                    image_rgb=image_rgb,
+                    threshold=0.5,
+                    return_probabilities=True,
+                    class_idx=class_idx
                 )
 
-                with torch.no_grad():
-                    output = self.model(input_tensor)
-
-                num_channels = output.shape[1]
-                if num_channels == 1:
-                    prob_map_raw = torch.sigmoid(output).squeeze().cpu().numpy()
-                else:
-                    probs = torch.softmax(output, dim=1)
-                    prob_map_raw = probs[:, class_idx, :, :].squeeze().cpu().numpy()
-
-                prob_map = cv2.resize(prob_map_raw, original_size, interpolation=cv2.INTER_LINEAR)
-                h, w = prob_map.shape
-
+                h, w = original_size
                 vis_img = image_rgb.copy()
 
                 binary_mask = (prob_map >= min_threshold).astype(np.uint8)
