@@ -248,8 +248,8 @@ class LazyNet:
         # Определяем динамические оси (опционально)
         if dynamic_axes is None:
             dynamic_axes = {
-                'input': {0: 'batch_size', 2: 'height', 3: 'width'},
-                'output': {0: 'batch_size', 2: 'height', 3: 'width'}
+                'input': {0: 'batch_size'},
+                'output': {0: 'batch_size'}
             }
 
         # Создаем директорию если нужно
