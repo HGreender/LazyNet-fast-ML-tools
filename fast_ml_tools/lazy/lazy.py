@@ -220,6 +220,59 @@ class LazyNet:
         self.model.to(self.device)
         print(f'Веса загружены из {path}')
 
+    def export_to_onnx(
+            self,
+            onnx_path: str = './lazy_data/models/model.onnx',
+            input_shape: tuple = (1, 3, 512, 512),
+            opset_version: int = 17,
+            dynamic_axes: dict = None
+    ):
+        """
+        Экспорт модели в ONNX формат.
+
+        Args:
+            onnx_path: Путь для сохранения ONNX модели
+            input_shape: Форма входного тензора (batch, channels, height, width)
+            opset_version: Версия ONNX opset
+            dynamic_axes: Словарь для динамических осей (опционально)
+        """
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована. Невозможно выполнить экспорт.")
+
+        # Устанавливаем режим eval
+        self.model.eval()
+
+        # Создаем dummy input
+        dummy_input = torch.randn(input_shape).to(self.device)
+
+        # Определяем динамические оси (опционально)
+        if dynamic_axes is None:
+            dynamic_axes = {
+                'input': {0: 'batch_size', 2: 'height', 3: 'width'},
+                'output': {0: 'batch_size', 2: 'height', 3: 'width'}
+            }
+
+        # Создаем директорию если нужно
+        os.makedirs(os.path.dirname(onnx_path) or '.', exist_ok=True)
+
+        # Экспортируем в ONNX с отключенным Dynamo
+        torch.onnx.export(
+            self.model,
+            dummy_input,
+            onnx_path,
+            export_params=True,
+            opset_version=opset_version,
+            do_constant_folding=True,
+            input_names=['input'],
+            output_names=['output'],
+            dynamic_axes=dynamic_axes,
+            verbose=False,
+            dynamo=False
+        )
+
+        print(f"Модель успешно экспортирована в ONNX: {onnx_path}")
+        return onnx_path
+
     def fit(
             self,
             save_model_path: str = './lazy_data/models/best_model.pth',
