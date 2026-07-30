@@ -5,14 +5,22 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-from fast_ml_tools.ml.datasets import create_train_val_datasets_from_multiple_dirs, MultiDirsDataset
-from fast_ml_tools.ml.models import efficientnetb4_unet, efficientnetb4_unetpp
 from fast_ml_tools.ml.trainer import Trainer
-from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
-from fast_ml_tools.ml.losses import DiceBCELoss, FocalLoss, DiceFocalLoss, IoUFocalLoss
-from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
-from fast_ml_tools.ml.utils import preprocess_image_array_for_model, postprocess_prediction, get_device
+from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
+from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
+from fast_ml_tools.ml.utils import (preprocess_image_array_for_model,
+                                    postprocess_prediction,
+                                    get_device)
+from fast_ml_tools.ml.models import (efficientnetb4_unet,
+                                     efficientnetb4_unetpp)
+from fast_ml_tools.ml.losses import (DiceBCELoss,
+                                     FocalLoss,
+                                     DiceFocalLoss,
+                                     IoUFocalLoss)
+from fast_ml_tools.ml.datasets import (create_train_val_datasets_from_multiple_dirs,
+                                       MultiDirsDataset,
+                                       create_weighted_sampler)
 
 MODEL_FACTORIES = {
     'efficientnetb4_unet': efficientnetb4_unet,
@@ -48,21 +56,29 @@ class LazyNet:
             early_stopping_threshold=10,
             epochs: int = 100,
             batch_size: int = 1,
-            lr: float = 1e-4,
+            lr: float = 2.5e-4,
             lr_patience: int = 8,
-            lr_factor: float = 0.1,
+            lr_factor: float = 0.2,
             weight_decay: float = 1e-4,
             verbose: bool = True,
             device_id: int = 0,
             num_workers: int = 0,
             classes: list = ['target_class'],
-            metric_names: list = None
+            metric_names: list = None,
+            stratify_by_mask: bool = True,
+            min_pixels_threshold: int = 10,
+            positive_weight: float = 1.0
     ):
         self.device = get_device(device_id)
         self.verbose = verbose
         self.model_path = model_path
         self.mask_suffix = mask_suffix
         self.model = None
+
+        # Параметры балансировки
+        self.stratify_by_mask = stratify_by_mask
+        self.min_pixels_threshold = min_pixels_threshold
+        self.positive_weight = positive_weight
 
         if model is not None:
             self.model = model
@@ -100,7 +116,9 @@ class LazyNet:
                     seed=train_val_seed,
                     train_augmentation=self.train_augmentation,
                     val_augmentation=self.val_augmentation,
-                    mask_suffix=self.mask_suffix
+                    mask_suffix=self.mask_suffix,
+                    stratify_by_mask=self.stratify_by_mask,
+                    min_pixels_threshold=self.min_pixels_threshold
                 )
             else:
                 if len(val_img_dirs) != len(val_mask_dirs):
@@ -120,13 +138,31 @@ class LazyNet:
                 )
 
             if self.train_dataset:
-                self.train_loader = DataLoader(
-                    self.train_dataset,
-                    batch_size=batch_size,
-                    shuffle=True,
-                    num_workers=num_workers,
-                    pin_memory=True
-                )
+                # use_sampler = self.stratify_by_mask and isinstance(self.train_dataset, type(self.val_dataset))
+
+                if isinstance(self.train_dataset, type(self.val_dataset)) and hasattr(self.train_dataset, 'samples'):
+                    sampler = create_weighted_sampler(
+                        self.train_dataset,
+                        min_pixels_threshold=self.min_pixels_threshold,
+                        positive_weight=self.positive_weight
+                    )
+
+                    self.train_loader = DataLoader(
+                        self.train_dataset,
+                        batch_size=batch_size,
+                        sampler=sampler,  # Используем sampler вместо shuffle
+                        num_workers=num_workers,
+                        pin_memory=True
+                    )
+                else:
+                    # Если используются разные классы датасетов или sampler не применим, используем обычный shuffle
+                    self.train_loader = DataLoader(
+                        self.train_dataset,
+                        batch_size=batch_size,
+                        shuffle=True,
+                        num_workers=num_workers,
+                        pin_memory=True
+                    )
 
             if self.val_dataset:
                 self.val_loader = DataLoader(
