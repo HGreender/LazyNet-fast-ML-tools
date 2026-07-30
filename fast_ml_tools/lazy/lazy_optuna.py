@@ -24,6 +24,11 @@ class LazyNetOptuna:
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
 
+            # --- Настройки балансировки (по умолчанию включены) ---
+            stratify_by_mask: bool = True,
+            min_pixels_threshold: int = 10,
+            positive_weight: float = 1.0,
+
             # --- Пространства поиска гиперпараметров (Search Spaces) ---
             models_space: list = MODEL_FACTORIES,
             losses_space: list = LOSS_FACTORIES,
@@ -32,6 +37,9 @@ class LazyNetOptuna:
             batch_sizes: list = [8, 16, 32],
             lr_factor_range: tuple = (0.1, 0.5),  # (min, max)
             lr_patience_range: tuple = (5, 15),  # (min, max)
+
+            # Если None, используется фиксированный positive_weight из __init__
+            positive_weight_range: tuple | None = (1.0, 5.0),
     ):
         self.train_img_dirs = train_img_dirs
         self.train_mask_dirs = train_mask_dirs
@@ -44,6 +52,12 @@ class LazyNetOptuna:
         self.save_dir = save_dir
         self.train_ratio = train_ratio
         self.train_val_seed = train_val_seed
+
+        # Параметры балансировки
+        self.stratify_by_mask = stratify_by_mask
+        self.min_pixels_threshold = min_pixels_threshold
+        self.positive_weight = positive_weight
+        self.positive_weight_range = positive_weight_range
 
         # Сохраняем пространства поиска
         self.models_space = models_space
@@ -71,6 +85,16 @@ class LazyNetOptuna:
             lr_factor = trial.suggest_float('lr_factor', self.lr_factor_range[0], self.lr_factor_range[1], step=0.1)
             lr_patience = trial.suggest_int('lr_patience', self.lr_patience_range[0], self.lr_patience_range[1])
 
+            # 3. Поиск оптимального веса для positive класса (если включен диапазон)
+            current_pos_weight = self.positive_weight
+            if self.positive_weight_range:
+                current_pos_weight = trial.suggest_float(
+                    'positive_weight',
+                    self.positive_weight_range[0],
+                    self.positive_weight_range[1],
+                    step=1.0
+                )
+
             lazy_net = LazyNet(
                 model_name=model_name,
                 loss_name=loss_name,
@@ -89,7 +113,10 @@ class LazyNetOptuna:
                 device_id=self.device_id,
                 num_workers=self.num_workers,
                 classes=self.classes,
-                metric_names=None
+                metric_names=None,
+                stratify_by_mask=self.stratify_by_mask,
+                min_pixels_threshold=self.min_pixels_threshold,
+                positive_weight=current_pos_weight
             )
 
             best_val_loss = lazy_net.fit_with_optuna(
