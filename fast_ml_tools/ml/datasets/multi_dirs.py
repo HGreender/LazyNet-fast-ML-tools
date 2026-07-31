@@ -125,7 +125,6 @@ class MultiDirsDatasetFromSamples(Dataset):
         """
         self.samples = samples
         self.augmentation = augmentation
-        print(f"MultiDirsDatasetFromSamples: создано {len(self.samples)} сэмплов")
 
     def __len__(self):
         return len(self.samples)
