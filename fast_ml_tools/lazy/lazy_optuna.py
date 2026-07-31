@@ -21,6 +21,7 @@ class LazyNetOptuna:
             epochs: int = 30,
             n_trials: int = 30,
             save_dir: str = './optuna_trials',
+            use_checkpoints: bool | None = None,
             train_ratio: float = 0.8,
             train_val_seed: int = 42,
 
@@ -50,6 +51,7 @@ class LazyNetOptuna:
         self.default_epochs = epochs
         self.n_trials = n_trials
         self.save_dir = save_dir
+        self.use_checkpoints = use_checkpoints
         self.train_ratio = train_ratio
         self.train_val_seed = train_val_seed
 
@@ -121,7 +123,8 @@ class LazyNetOptuna:
             best_val_loss = lazy_net.fit_with_optuna(
                 trial=trial,
                 save_dir=self.save_dir,
-                epochs=self.default_epochs
+                epochs=self.default_epochs,
+                use_checkpoints=self.use_checkpoints
             )
 
             return best_val_loss
