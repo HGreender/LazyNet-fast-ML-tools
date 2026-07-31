@@ -92,7 +92,6 @@ class LazyNetOptuna:
                     'positive_weight',
                     self.positive_weight_range[0],
                     self.positive_weight_range[1],
-                    step=1.0
                 )
 
             lazy_net = LazyNet(
