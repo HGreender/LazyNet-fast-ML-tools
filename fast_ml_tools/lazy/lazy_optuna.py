@@ -37,7 +37,8 @@ class LazyNetOptuna:
             wd_range: tuple = (1e-6, 1e-4),  # (min, max)
             batch_sizes: list = [8, 16, 32],
             lr_factor_range: tuple = (0.1, 0.5),  # (min, max)
-            lr_patience_range: tuple = (5, 15),  # (min, max)
+            lr_patience_range: tuple = (5, 15),  # (min, max),
+            early_stopping_threshold_range: tuple = (8, 12),
 
             # Если None, используется фиксированный positive_weight из __init__
             positive_weight_range: tuple | None = (1.0, 5.0),
@@ -69,6 +70,7 @@ class LazyNetOptuna:
         self.batch_sizes = batch_sizes
         self.lr_factor_range = lr_factor_range
         self.lr_patience_range = lr_patience_range
+        self.early_stopping_threshold_range = early_stopping_threshold_range
 
         self.study = None
 
@@ -86,8 +88,11 @@ class LazyNetOptuna:
             weight_decay = trial.suggest_float('weight_decay', self.wd_range[0], self.wd_range[1], log=True)
             lr_factor = trial.suggest_float('lr_factor', self.lr_factor_range[0], self.lr_factor_range[1], step=0.1)
             lr_patience = trial.suggest_int('lr_patience', self.lr_patience_range[0], self.lr_patience_range[1])
-
-            # 3. Поиск оптимального веса для positive класса (если включен диапазон)
+            early_stopping_threshold = trial.suggest_int(
+                'early_stopping_threshold',
+                self.early_stopping_threshold_range[0],
+                self.early_stopping_threshold_range[1]
+            )
             current_pos_weight = self.positive_weight
             if self.positive_weight_range:
                 current_pos_weight = trial.suggest_float(
@@ -104,6 +109,7 @@ class LazyNetOptuna:
                 mask_suffix=self.mask_suffix,
                 train_ratio=self.train_ratio,
                 train_val_seed=self.train_val_seed,
+                early_stopping_threshold=early_stopping_threshold,
                 epochs=self.default_epochs,
                 batch_size=batch_size,
                 lr=lr,
