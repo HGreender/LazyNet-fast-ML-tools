@@ -338,7 +338,8 @@ class LazyNet:
             self,
             trial,
             save_dir: str = './optuna_trials',
-            epochs: int = None
+            epochs: int = None,
+            use_checkpoints: bool | None = None
     ):
         """
         Метод для обучения с поддержкой Optuna pruning.
@@ -355,12 +356,14 @@ class LazyNet:
 
         save_model_path = os.path.join(trial_dir, 'best_model.pth')
         save_logs_path = os.path.join(trial_dir, 'logs.json')
+        save_checkpoint_path = os.path.join(trial_dir, 'checkpoint.pth') if use_checkpoints else None
 
         # Обучаем с передачей trial для pruning
         self.train_logs = self.trainer.fit(
             epochs=epochs or self.epochs,
             save_path=save_model_path,
             log_path=save_logs_path,
+            save_checkpoint_path=save_checkpoint_path,
             optuna_trial=trial
         )
 
