@@ -46,6 +46,7 @@ class LazyNet:
             model_path: str = None,
             model=None,
             loss_name: str = None,
+            augmentation_fn: callable = None,
             train_img_dirs: list[str] = None,
             train_mask_dirs: list[str] = None,
             val_img_dirs: list[str] = None,
@@ -55,7 +56,7 @@ class LazyNet:
             train_val_seed: int = 42,
             early_stopping_threshold=10,
             epochs: int = 100,
-            batch_size: int = 1,
+            batch_size: int = 4,
             lr: float = 2.5e-4,
             lr_patience: int = 8,
             lr_factor: float = 0.2,
@@ -95,8 +96,9 @@ class LazyNet:
         self.metric_names = metric_names
 
         # Аугментации нужны всегда
-        self.train_augmentation = get_imagenet_encoder_augmentation(phase='train')
-        self.val_augmentation = get_imagenet_encoder_augmentation(phase='valid')
+        aug_fn = augmentation_fn or get_imagenet_encoder_augmentation
+        self.train_augmentation = aug_fn(phase='train', size=(512, 512))
+        self.val_augmentation = aug_fn(phase='valid', size=(512, 512))
 
         # 2. Датасеты и Лоадеры
         self.train_loader = None

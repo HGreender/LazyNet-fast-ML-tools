@@ -13,6 +13,7 @@ class LazyNetOptuna:
             train_img_dirs: list[str],
             train_mask_dirs: list[str],
             mask_suffix: str | list[str] = "_mask",
+            augmentation_fn: callable = None,
 
             # --- Общие настройки ---
             classes: list = ['target_class'],
@@ -46,6 +47,7 @@ class LazyNetOptuna:
         self.train_img_dirs = train_img_dirs
         self.train_mask_dirs = train_mask_dirs
         self.mask_suffix = mask_suffix
+        self.augmentation_fn = augmentation_fn
         self.classes = classes
         self.device_id = device_id
         self.num_workers = num_workers
@@ -106,6 +108,7 @@ class LazyNetOptuna:
                 loss_name=loss_name,
                 train_img_dirs=self.train_img_dirs,
                 train_mask_dirs=self.train_mask_dirs,
+                augmentation_fn=self.augmentation_fn,
                 mask_suffix=self.mask_suffix,
                 train_ratio=self.train_ratio,
                 train_val_seed=self.train_val_seed,
