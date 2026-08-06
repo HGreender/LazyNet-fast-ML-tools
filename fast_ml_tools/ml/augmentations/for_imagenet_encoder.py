@@ -29,8 +29,8 @@ def get_imagenet_encoder_augmentation(
                 A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2),
                 A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
             ], p=0.2),
-            A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             A.Resize(size[0], size[1]),
+            A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
         ]),
     else:
