@@ -21,21 +21,21 @@ def get_imagenet_encoder_augmentation(
                 border_mode=cv2.BORDER_CONSTANT,
                 p=0.5
             ),
+            A.Resize(size[0], size[1]),
             A.OneOf([
-                A.GaussNoise(std_range=(0.1, 0.2)),
-                A.MotionBlur(blur_limit=3),
+                A.GaussNoise(var_limit=(10.0, 50.0)),
+                A.GaussianBlur(blur_limit=(3, 5)),
             ], p=0.2),
             A.OneOf([
                 A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2),
                 A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
             ], p=0.2),
-            A.Resize(size[0], size[1]),
             A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
         ]),
     else:
         return A.Compose([
-            A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             A.Resize(size[0], size[1]),
+            A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
         ])
