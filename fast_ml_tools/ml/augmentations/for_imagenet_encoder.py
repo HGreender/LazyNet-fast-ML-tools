@@ -13,7 +13,6 @@ def get_imagenet_encoder_augmentation(
     """Аугментации, важные для медицинских снимков"""
     if phase == 'train':
         return A.Compose([
-            A.Resize(size[0], size[1]),
             A.HorizontalFlip(p=0.5),
             A.Affine(
                 translate_percent=0.05,
@@ -32,10 +31,11 @@ def get_imagenet_encoder_augmentation(
             ], p=0.2),
             A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
-        ])
+            A.Resize(size[0], size[1])
+        ]),
     else:
         return A.Compose([
-            A.Resize(size[0], size[1]),
             A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+            A.Resize(size[0], size[1]),
             ToTensorV2(),
         ])
