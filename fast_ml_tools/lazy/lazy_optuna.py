@@ -42,7 +42,7 @@ class LazyNetOptuna:
             early_stopping_threshold_range: tuple = (8, 12),
 
             # Если None, используется фиксированный positive_weight из __init__
-            positive_weight_range: tuple | None = (1.0, 5.0),
+            positive_weight_range: tuple | None = None
     ):
         self.train_img_dirs = train_img_dirs
         self.train_mask_dirs = train_mask_dirs
