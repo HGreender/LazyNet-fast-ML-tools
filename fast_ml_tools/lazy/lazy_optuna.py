@@ -4,6 +4,7 @@ import gc
 
 from fast_ml_tools import LazyNet
 from fast_ml_tools.lazy.lazy import MODEL_FACTORIES, LOSS_FACTORIES
+from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 
 
 class LazyNetOptuna:
@@ -13,7 +14,7 @@ class LazyNetOptuna:
             train_img_dirs: list[str],
             train_mask_dirs: list[str],
             mask_suffix: str | list[str] = "_mask",
-            augmentation_fn: callable = None,
+            augmentation_fn: callable = get_imagenet_encoder_augmentation,
 
             # --- Общие настройки ---
             classes: list = ['target_class'],

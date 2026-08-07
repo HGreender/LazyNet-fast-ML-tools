@@ -46,7 +46,7 @@ class LazyNet:
             model_path: str = None,
             model=None,
             loss_name: str = None,
-            augmentation_fn: callable = None,
+            augmentation_fn: callable = get_imagenet_encoder_augmentation,
             train_img_dirs: list[str] = None,
             train_mask_dirs: list[str] = None,
             val_img_dirs: list[str] = None,
@@ -96,7 +96,7 @@ class LazyNet:
         self.metric_names = metric_names
 
         # Аугментации нужны всегда
-        aug_fn = augmentation_fn or get_imagenet_encoder_augmentation
+        aug_fn = augmentation_fn
         self.train_augmentation = aug_fn(phase='train', size=(512, 512))
         self.val_augmentation = aug_fn(phase='valid', size=(512, 512))
 
