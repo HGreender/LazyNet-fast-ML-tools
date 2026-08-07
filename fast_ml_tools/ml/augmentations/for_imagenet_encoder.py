@@ -32,7 +32,7 @@ def get_imagenet_encoder_augmentation(
             ], p=0.2),
             A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
-        ]),
+        ])
     else:
         return A.Compose([
             A.Resize(size[0], size[1]),
