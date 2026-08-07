@@ -23,7 +23,7 @@ def get_imagenet_encoder_augmentation(
             ),
             A.Resize(size[0], size[1]),
             A.OneOf([
-                A.GaussNoise(var_limit=(10.0, 50.0)),
+                A.GaussNoise(std_range=(10.0, 50.0)),
                 A.GaussianBlur(blur_limit=(3, 5)),
             ], p=0.2),
             A.OneOf([
@@ -64,16 +64,15 @@ def get_lungs_imagenet_encoder_augmentation(
                 A.Crop(x_min=256, y_min=0, x_max=512, y_max=512, p=1.0),  # Правая половина
                 A.CenterCrop(height=350, width=350, p=1.0),  # Центральный фрагмент
                 A.RandomSizedCrop(
-                    min_max_height=(250, 480),  # Диапазон высот кропов
-                    height=512,  # Целевой размер после ресайза
-                    width=512,
-                    interpolation=cv2.INTER_LINEAR,  # Для изображений
-                    mask_interpolation=cv2.INTER_NEAREST,  # ⚠️ ОБЯЗАТЕЛЬНО для масок!
+                    min_max_height=(250, 480),
+                    size=(size[0], size[1]),  # ← ОБЯЗАТЕЛЬНЫЙ параметр
+                    interpolation=cv2.INTER_LINEAR,
+                    mask_interpolation=cv2.INTER_NEAREST,
                 )
             ], p=0.34),
             A.Resize(size[0], size[1]),
             A.OneOf([
-                A.GaussNoise(var_limit=(10.0, 50.0)),
+                A.GaussNoise(std_range=(10.0, 50.0)),
                 A.GaussianBlur(blur_limit=(3, 7)),
             ], p=0.2),
             A.OneOf([
