@@ -23,7 +23,7 @@ def get_imagenet_encoder_augmentation(
             ),
             A.Resize(size[0], size[1]),
             A.OneOf([
-                A.GaussNoise(std_range=(10.0, 50.0)),
+                A.GaussNoise(std_range=(0.02, 0.1)),
                 A.GaussianBlur(blur_limit=(3, 5)),
             ], p=0.2),
             A.OneOf([
@@ -72,7 +72,7 @@ def get_lungs_imagenet_encoder_augmentation(
             ], p=0.34),
             A.Resize(size[0], size[1]),
             A.OneOf([
-                A.GaussNoise(std_range=(10.0, 50.0)),
+                A.GaussNoise(std_range=(0.02, 0.1)),
                 A.GaussianBlur(blur_limit=(3, 7)),
             ], p=0.2),
             A.OneOf([
