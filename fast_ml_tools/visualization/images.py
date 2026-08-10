@@ -60,7 +60,12 @@ def show_segmentation(image_rgb, binary_mask, save_path=None, is_show = True):
     plt.close('all')
 
 
-def show_n_augmentations(image_path, mask_path, n_samples=3, size = (512, 512)):
+def show_n_augmentations(
+        image_path,
+        mask_path,
+        augmentation_fn: callable = get_imagenet_encoder_augmentation,
+        n_samples=3, size = (512, 512)
+):
     """
     Показывает оригинал и аугментированные пары Image + Mask.
     """
@@ -80,7 +85,7 @@ def show_n_augmentations(image_path, mask_path, n_samples=3, size = (512, 512)):
     # Albumentations лучше работает с масками, где классы обозначены целыми числами
 
     # 3. Подготовка трансформации
-    transform = get_imagenet_encoder_augmentation(phase='train')
+    transform = augmentation_fn(phase='train', size=(512, 512))
 
     # 4. Ресайз оригинала для сравнения
     orig_resized_img = cv2.resize(image_rgb, (size[1], size[0]))
