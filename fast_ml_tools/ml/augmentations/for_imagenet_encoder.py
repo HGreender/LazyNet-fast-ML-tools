@@ -48,37 +48,41 @@ def get_lungs_imagenet_encoder_augmentation(
     """Агрессивные аугментации, важные для медицинских снимков лёгких"""
     if phase == 'train':
         return A.Compose([
+            A.Resize(size[0], size[1]),
+
             A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.3),
+
             A.Affine(
-                translate_percent=(-0.3, 0.3),
-                scale=(0.5, 2.5),
+                translate_percent=(-0.35, 0.35),
                 rotate=(-25, 25),
                 border_mode=cv2.BORDER_CONSTANT,
                 fill=0,
                 p=0.5
             ),
-            A.ElasticTransform(alpha=1, sigma=50, p=0.3),
+
             A.OneOf([
-                A.Crop(x_min=0, y_min=0, x_max=256, y_max=512, p=1.0),  # Левая половина
-                A.Crop(x_min=256, y_min=0, x_max=512, y_max=512, p=1.0),  # Правая половина
-                A.CenterCrop(height=350, width=350, p=1.0),  # Центральный фрагмент
+                A.RandomCrop(height=350, width=350),
                 A.RandomSizedCrop(
-                    min_max_height=(250, 480),
-                    size=(size[0], size[1]),  # ← ОБЯЗАТЕЛЬНЫЙ параметр
+                    min_max_height=(350, 500),  # ← диапазон высоты кропа
+                    size=(512, 512),  # ← целевой размер после ресайза
+                    w2h_ratio=1.0,  # ← ГАРАНТИРУЕТ квадратный кроп (сохраняет пропорции)
                     interpolation=cv2.INTER_LINEAR,
-                    mask_interpolation=cv2.INTER_NEAREST,
+                    mask_interpolation=cv2.INTER_NEAREST
                 )
-            ], p=0.34),
+            ], p=0.5),
+
             A.Resize(size[0], size[1]),
+
             A.OneOf([
                 A.GaussNoise(std_range=(0.02, 0.1)),
                 A.GaussianBlur(blur_limit=(3, 7)),
-            ], p=0.2),
+            ], p=0.3),
+
             A.OneOf([
                 A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2),
-                A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
-            ], p=0.2),
+                A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8)),
+            ], p=0.4),
+
             A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
         ])
