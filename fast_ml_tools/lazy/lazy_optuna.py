@@ -1,6 +1,7 @@
 import optuna
 import torch
 import gc
+import os
 
 from fast_ml_tools import LazyNet
 from fast_ml_tools.lazy.lazy import MODEL_FACTORIES, LOSS_FACTORIES
@@ -43,7 +44,11 @@ class LazyNetOptuna:
             early_stopping_threshold_range: tuple = (8, 12),
 
             # Если None, используется фиксированный positive_weight из __init__
-            positive_weight_range: tuple | None = None
+            positive_weight_range: tuple | None = None,
+
+            # Параметры для Optuna
+            study_name: str = "lazynet_seg",
+            direction: str = "minimize"
     ):
         self.train_img_dirs = train_img_dirs
         self.train_mask_dirs = train_mask_dirs
@@ -75,6 +80,9 @@ class LazyNetOptuna:
         self.lr_patience_range = lr_patience_range
         self.early_stopping_threshold_range = early_stopping_threshold_range
 
+        self.study_name = study_name
+        self.direction = direction
+        self.storage = f"sqlite:///{os.path.join(self.save_dir, 'study.db')}"
         self.study = None
 
     def _objective(self, trial):
@@ -147,21 +155,112 @@ class LazyNetOptuna:
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
-    def run(self, direction='minimize', n_warmup_steps=5):
+    def run(
+            self,
+            study_name: str = 'lazynet_seg',
+            direction: str = 'minimize',
+            n_warmup_steps: int = 5,
+            n_trials: int | None = None,
+    ):
         """Запуск оптимизации"""
+        os.makedirs(self.save_dir, exist_ok=True)
+
+        final_study_name = study_name or self.study_name
         self.study = optuna.create_study(
+            study_name=final_study_name,
+            storage=self.storage,
             direction=direction,
-            pruner=optuna.pruners.MedianPruner(n_warmup_steps=n_warmup_steps)
+            pruner=optuna.pruners.MedianPruner(n_warmup_steps=n_warmup_steps),
+            load_if_exists=True,
         )
+
+        completed = len(self.study.get_trials(states=[optuna.trial.TrialState.COMPLETE]))
+        print(f"Study '{final_study_name}': {completed} completed trials loaded")
 
         self.study.optimize(
             self._objective,
-            n_trials=self.n_trials,
+            n_trials=n_trials or self.n_trials,
             catch=(ValueError, RuntimeError, torch.cuda.OutOfMemoryError)
         )
 
         print(f"✅ Оптимизация завершена! Лучший результат: {self.study.best_value:.4f}")
         return self.study
+
+    def delete_study(self, study_name: str | None = None):
+        """Удалить study из хранилища"""
+        name = study_name or self.study_name
+        try:
+            optuna.delete_study(study_name=name, storage=self.storage)
+            self.study = None
+            print(f"🗑️ Study '{name}' удалён")
+        except KeyError:
+            print(f"⚠️ Study '{name}' не найден")
+
+    def list_studies(self):
+        """Отобразить все studies в хранилище с их статистикой"""
+        try:
+            study_names = optuna.get_all_study_names(storage=self.storage)
+        except Exception as e:
+            print(f"❌ Не удалось прочитать хранилище: {e}")
+            return []
+
+        if not study_names:
+            print("📭 В хранилище нет studies")
+            return []
+
+        print(
+            f"\n{'Study Name':<25} {'Direction':<10} {'Complete':>8} {'Running':>7} {'Pruned':>6} {'Fail':>4} {'Total':>5} {'Best Value':>12}")
+        print("─" * 95)
+
+        studies_info = []
+        for name in sorted(study_names):
+            try:
+                study = optuna.load_study(study_name=name, storage=self.storage)
+            except Exception:
+                continue
+
+            trials = study.get_trials(deepcopy=False)
+            states = {s: 0 for s in optuna.trial.TrialState}
+            for t in trials:
+                states[t.state] += 1
+
+            best_val = None
+            complete_trials = [t for t in trials if t.state == optuna.trial.TrialState.COMPLETE]
+            if complete_trials:
+                best_trial = min(complete_trials, key=lambda t: t.value) \
+                    if study.direction == optuna.study.StudyDirection.MINIMIZE \
+                    else max(complete_trials, key=lambda t: t.value)
+                best_val = f"{best_trial.value:.4f}"
+            else:
+                best_val = "—"
+
+            direction_str = "min" if study.direction == optuna.study.StudyDirection.MINIMIZE else "max"
+
+            info = {
+                "name": name,
+                "direction": direction_str,
+                "complete": states[optuna.trial.TrialState.COMPLETE],
+                "running": states[optuna.trial.TrialState.RUNNING],
+                "pruned": states[optuna.trial.TrialState.PRUNED],
+                "fail": states[optuna.trial.TrialState.FAIL],
+                "total": len(trials),
+                "best_value": best_val,
+            }
+            studies_info.append(info)
+
+            print(
+                f"{info['name']:<25} "
+                f"{info['direction']:<10} "
+                f"{info['complete']:>8} "
+                f"{info['running']:>7} "
+                f"{info['pruned']:>6} "
+                f"{info['fail']:>4} "
+                f"{info['total']:>5} "
+                f"{info['best_value']:>12}"
+            )
+
+        print()
+        return studies_info
 
     def get_best_params(self):
         if not self.study:
