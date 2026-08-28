@@ -14,21 +14,21 @@ except ImportError:
 
 def get_image_size_from_json(item):
     """Пытается получить размер из метаданных JSON"""
-    if 'width' in item and 'height' in item:
-        return (item['width'], item['height'])
-    elif 'size' in item['image']:
-        return (item['image']['size'][1], item['image']['size'][0])
-    else:
+    try:
+        if 'width' in item and 'height' in item:
+            return (item['width'], item['height'])
+        elif 'size' in item['image']:
+            return (item['image']['size'][1], item['image']['size'][0])
+        else:
+            return None
+    except Exception:
         return None
 
 
 def get_image_size_from_file(item_id, base_dir, is_dicom):
     """Пытается получить размер, открыв оригинальный файл"""
     # Пробуем разные расширения
-    extensions = ['.dcm', '.png', '.jpg', '.jpeg', '.bmp'] if not is_dicom else ['.dcm']
-    if not is_dicom:
-        # Для обычных изображений добавим все популярные форматы
-        extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']
+    extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff'] if not is_dicom else ['.dcm']
 
     for ext in extensions:
         # Для default.json ID обычно совпадают с именем файла
