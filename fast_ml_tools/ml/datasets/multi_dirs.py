@@ -1,11 +1,56 @@
 import os
 import random
-from typing import Optional
 
 import cv2
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+from torch.utils.data import Dataset, WeightedRandomSampler
+
+
+class InferenceDataset(Dataset):
+    """
+    Легкий датасет для пакетного инференса.
+    Читает изображения с диска и возвращает их в формате RGB вместе с метаданными.
+    Аугментация применяется отдельно перед подачей в модель.
+    """
+    def __init__(self, file_paths: list[str]):
+        """
+        Args:
+            file_paths: Список полных путей к изображениям.
+        """
+        self.file_paths = file_paths
+
+    def __len__(self):
+        return len(self.file_paths)
+
+    def __getitem__(self, idx: int) -> dict:
+        path = self.file_paths[idx]
+        
+        # Чтение изображения
+        img_cv = cv2.imread(path)
+        
+        if img_cv is None:
+            # Возвращаем словарь с флагом ошибки, чтобы DataLoader не упал, 
+            # а мы могли пропустить этот файл в цикле обработки
+            return {
+                'valid': False,
+                'path': path,
+                'filename': os.path.basename(path),
+                'image_rgb': None,
+                'original_size': None
+            }
+        
+        # Конвертация BGR -> RGB
+        img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+        h, w = img_rgb.shape[:2]
+        
+        return {
+            'valid': True,
+            'path': path,
+            'filename': os.path.basename(path),
+            'image_rgb': img_rgb,
+            'original_size': (w, h)  # (Width, Height) для совместимости с cv2.resize
+        }
 
 
 class MultiDirsDataset(Dataset):

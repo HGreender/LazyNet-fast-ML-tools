@@ -1,13 +1,17 @@
 import os
+import gc
 from tqdm import tqdm
 import cv2
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
+from concurrent.futures import ThreadPoolExecutor
 
 from fast_ml_tools.ml.trainer import Trainer
 from fast_ml_tools.ml.metrics import get_segmentation_metrics
-from fast_ml_tools.visualization import plot_epochs_data, show_segmentation
+from fast_ml_tools.visualization import (plot_epochs_data, 
+                                         show_segmentation, 
+                                         create_overlay_cv2)
 from fast_ml_tools.ml.augmentations import get_imagenet_encoder_augmentation
 from fast_ml_tools.ml.utils import (preprocess_image_array_for_model,
                                     postprocess_prediction,
@@ -19,6 +23,7 @@ from fast_ml_tools.ml.losses import (DiceBCELoss,
                                      DiceFocalLoss,
                                      IoUFocalLoss)
 from fast_ml_tools.ml.datasets import (create_train_val_datasets_from_multiple_dirs,
+                                       InferenceDataset,
                                        MultiDirsDataset,
                                        create_weighted_sampler)
 
@@ -75,6 +80,7 @@ class LazyNet:
         self.model_path = model_path
         self.mask_suffix = mask_suffix
         self.model = None
+        self.num_workers = num_workers
 
         # Параметры балансировки
         self.stratify_by_mask = stratify_by_mask
@@ -153,7 +159,7 @@ class LazyNet:
                         self.train_dataset,
                         batch_size=batch_size,
                         sampler=sampler,  # Используем sampler вместо shuffle
-                        num_workers=num_workers,
+                        num_workers=self.num_workers,
                         pin_memory=True
                     )
                 else:
@@ -162,7 +168,7 @@ class LazyNet:
                         self.train_dataset,
                         batch_size=batch_size,
                         shuffle=True,
-                        num_workers=num_workers,
+                        num_workers=self.num_workers,
                         pin_memory=True
                     )
 
@@ -171,7 +177,7 @@ class LazyNet:
                     self.val_dataset,
                     batch_size=batch_size,
                     shuffle=False,
-                    num_workers=num_workers,
+                    num_workers=self.num_workers,
                     pin_memory=True
                 )
 
@@ -521,6 +527,140 @@ class LazyNet:
             return binary_mask, prob_map
         return binary_mask
 
+    def predict_folder(
+            self,
+            input_dir: str,
+            output_dir: str = './lazy_data/predictions/',
+            threshold: float = 0.5,
+            save_masks: bool = True,
+            save_concat: bool = True,
+            batch_size: int = 50,
+            num_workers: int = 2,
+            save_workers: int = 4,
+            mask_suffix: str = '_mask',
+            viz_suffix: str = '_viz',
+            overlay_color: tuple[int] = (0, 255, 0),
+            overlay_strength: float = 0.5,
+    ):
+        if self.model is None:
+            raise RuntimeError("Модель не инициализирована.")
+
+        self.model.eval()
+
+        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tif')
+        all_files = [
+            os.path.join(input_dir, f)
+            for f in os.listdir(input_dir)
+            if f.lower().endswith(valid_extensions)
+        ]
+        all_files.sort()
+
+        if not all_files:
+            print(f"В папке {input_dir} не найдено изображений.")
+            return
+
+        masks_dir = os.path.join(output_dir, 'masks') if save_masks else None
+        concat_dir = os.path.join(output_dir, 'concat') if save_concat else None
+        if masks_dir: os.makedirs(masks_dir, exist_ok=True)
+        if concat_dir: os.makedirs(concat_dir, exist_ok=True)
+
+        inf_dataset = InferenceDataset(all_files)
+        inf_loader = DataLoader(
+            inf_dataset, batch_size=batch_size, shuffle=False,
+            num_workers=num_workers, pin_memory=False,
+            collate_fn=lambda x: x
+        )
+
+        print(f"Обработка {len(all_files)} изображений (batch={batch_size}, save_workers={save_workers})...")
+
+        executor = ThreadPoolExecutor(max_workers=save_workers)
+        futures = []
+
+        with torch.no_grad():
+            for batch in tqdm(inf_loader, desc="Processing"):
+                processed_tensors = []
+                batch_metadata = []
+
+                for item in batch:
+                    if not item['valid']: continue
+                    augmented = self.val_augmentation(image=item['image_rgb'])
+                    processed_tensors.append(augmented['image'])
+                    batch_metadata.append(item)
+
+                if not processed_tensors: continue
+
+                input_batch = torch.stack(processed_tensors).to(self.device, non_blocking=True)
+                outputs = self.model(input_batch)
+
+                if outputs.shape[1] == 1:
+                    probs = torch.sigmoid(outputs).squeeze(1)
+                else:
+                    probs = torch.softmax(outputs, dim=1)[:, 0, :, :]
+
+                probs_cpu = probs.cpu().numpy()
+
+                for i in range(len(batch_metadata)):
+                    item = batch_metadata[i]
+                    prob_map_np = probs_cpu[i]
+                    orig_w, orig_h = item['original_size']
+                    name, ext = os.path.splitext(item['filename'])
+
+                    def _save_task(pmap, ow, oh, n, e, img_rgb):
+                        # Ресайз маски
+                        resized = cv2.resize(pmap, (ow, oh), interpolation=cv2.INTER_LINEAR)
+                        binary = (resized >= threshold).astype(np.uint8)
+
+                        # 1. Сохранение отдельной маски (как было)
+                        if save_masks and masks_dir:
+                            cv2.imwrite(os.path.join(masks_dir, f"{n}{mask_suffix}.png"), binary * 255)
+
+                        # 2. Сохранение тройного конката (Оригинал + Маска + Оверлей)
+                        if save_concat and concat_dir:
+                            try:
+                                # Создаем оверлей
+                                overlay_img = create_overlay_cv2(
+                                    img_rgb, 
+                                    binary, 
+                                    color=overlay_color, 
+                                    alpha=overlay_strength
+                                )
+                                
+                                # Создаем визуализацию маски (3 канала, чтобы можно было склеить с RGB)
+                                # binary имеет форму (H, W), превращаем в (H, W, 3)
+                                mask_viz = np.stack([binary * 255] * 3, axis=-1)
+
+                                # Убеждаемся, что все части одного размера
+                                h, w = img_rgb.shape[:2]
+                                if overlay_img.shape[:2] != (h, w):
+                                    overlay_img = cv2.resize(overlay_img, (w, h))
+                                if mask_viz.shape[:2] != (h, w):
+                                    mask_viz = cv2.resize(mask_viz, (w, h))
+
+                                # Горизонтальная склейка: [Оригинал | Маска | Оверлей]
+                                concat_result = np.hstack([img_rgb, mask_viz, overlay_img])
+                                
+                                # Сохраняем (конвертируем RGB -> BGR для OpenCV)
+                                save_path = os.path.join(concat_dir, f"{n}{viz_suffix}{e}")
+                                cv2.imwrite(save_path, cv2.cvtColor(concat_result, cv2.COLOR_RGB2BGR))
+                                
+                            except Exception as ex:
+                                print(f"Ошибка сохранения конката {n}: {ex}")
+
+                    future = executor.submit(_save_task, prob_map_np, orig_w, orig_h, name, ext, item['image_rgb'])
+                    futures.append(future)
+
+                del input_batch, outputs, probs, probs_cpu, processed_tensors
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
+        # Ожидаем завершения записи
+        for f in tqdm(futures, desc="Saving"):
+            f.result()
+
+        executor.shutdown(wait=True)
+        gc.collect()
+        print(f"Готово! Результаты в {output_dir}")
+
     def visualize_heatmap_contours(
             self,
             image_path: str,
@@ -644,55 +784,6 @@ class LazyNet:
                 plt.show()
 
         return vis_img
-
-    def predict_folder(
-            self,
-            input_dir: str,
-            output_dir: str = './lazy_data/predictions/',
-            threshold: float = 0.5,
-            save_masks: bool = True,
-            save_concat: bool = True,
-            visualize_console: bool = False,
-            mask_suffix: str = '_mask',
-            viz_suffix: str = '_viz'
-    ):
-        """Пакетное предсказание для всех изображений в папке."""
-        if self.model is None:
-            raise RuntimeError("Модель не инициализирована. Невозможно выполнить предсказание.")
-
-        self.model.eval()
-
-        masks_dir = os.path.join(output_dir, 'masks') if save_masks else None
-        concat_dir = os.path.join(output_dir, 'concat') if save_concat else None
-
-        if masks_dir: os.makedirs(masks_dir, exist_ok=True)
-        if concat_dir: os.makedirs(concat_dir, exist_ok=True)
-
-        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tif')
-        files = [f for f in os.listdir(input_dir) if f.lower().endswith(valid_extensions)]
-
-        if not files:
-            print(f"В папке {input_dir} не найдено изображений.")
-            return
-
-        print(f"Начинаю обработку {len(files)} изображений...")
-
-        for filename in tqdm(files, desc="Predicting"):
-            img_path = os.path.join(input_dir, filename)
-            name, ext = os.path.splitext(filename)
-
-            try:
-                self.predict_single(
-                    img_path,
-                    threshold=threshold,
-                    visualize=visualize_console,
-                    save_concat_path=os.path.join(concat_dir, f"{name}{viz_suffix}{ext}") if concat_dir else None,
-                    save_mask_path=os.path.join(masks_dir, f"{name}{mask_suffix}.png") if masks_dir else None
-                )
-            except Exception as e:
-                print(f"Ошибка при обработке {filename}: {e}")
-
-        print(f"Готово! Результаты сохранены в {output_dir}")
 
     def visualize_folder_heatmaps(
             self,

@@ -11,6 +11,36 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
+def create_overlay_cv2(image_rgb: np.ndarray, binary_mask: np.ndarray, color=(0, 255, 0), alpha=0.3):
+    """
+    Накладывает цветную маску только на область патологии, 
+    не затемняя фон.
+    """
+    if binary_mask.dtype != np.uint8:
+        binary_mask = (binary_mask > 0).astype(np.uint8)
+        
+    h, w = image_rgb.shape[:2]
+    
+    # 1. Создаем копию изображения
+    overlay = image_rgb.copy()
+    
+    # 2. Находим индексы, где есть маска
+    indices = np.where(binary_mask > 0)
+    
+    if indices[0].size > 0:
+        # 3. Создаем цветные пиксели только для этих областей
+        # Цвет пикселя = Оригинал * (1-alpha) + Color * alpha
+        original_pixels = overlay[indices].astype(np.float32)
+        color_pixels = np.array(color, dtype=np.float32)
+        
+        blended = (original_pixels * (1 - alpha) + color_pixels * alpha).astype(np.uint8)
+        
+        # 4. Записываем обратно
+        overlay[indices] = blended
+        
+    return overlay
+
+
 def show_segmentation(image_rgb, binary_mask, save_path=None, is_show = True):
     """
     Универсальная функция визуализации сегментации.
@@ -39,12 +69,12 @@ def show_segmentation(image_rgb, binary_mask, save_path=None, is_show = True):
     plt.subplot(1, 3, 3)
     plt.title("Overlay")
 
-    # Создаем цветную маску (красный канал)
-    color_mask = np.zeros_like(image_rgb)
-    color_mask[binary_mask == 1] = [255, 0, 0]
-
-    # Накладываем с прозрачностью
-    overlay = cv2.addWeighted(image_rgb, 1.0, color_mask, 0.2, 0)
+    overlay = create_overlay_cv2(
+        image_rgb, 
+        binary_mask, 
+        (255, 0, 0), 
+        0.3
+    )
     plt.imshow(overlay)
     plt.axis('off')
 
