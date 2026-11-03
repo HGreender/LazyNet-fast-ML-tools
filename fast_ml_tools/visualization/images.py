@@ -94,7 +94,9 @@ def show_n_augmentations(
         image_path,
         mask_path,
         augmentation_fn: callable = get_imagenet_encoder_augmentation,
-        n_samples=3, size = (512, 512)
+        n_samples=3, 
+        size = (512, 512),
+        aug_size = (512, 512)
 ):
     """
     Показывает оригинал и аугментированные пары Image + Mask.
@@ -115,7 +117,7 @@ def show_n_augmentations(
     # Albumentations лучше работает с масками, где классы обозначены целыми числами
 
     # 3. Подготовка трансформации
-    transform = augmentation_fn(phase='train', size=(512, 512))
+    transform = augmentation_fn(phase='train', size=aug_size)
 
     # 4. Ресайз оригинала для сравнения
     orig_resized_img = cv2.resize(image_rgb, (size[1], size[0]))
