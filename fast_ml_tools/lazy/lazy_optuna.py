@@ -71,6 +71,7 @@ class LazyNetOptuna:
         self.positive_weight_range = positive_weight_range
 
         # Сохраняем пространства поиска
+        self.models_names_space = models_space
         self.models_space = models_space
         self.losses_space = losses_space
         self.lr_range = lr_range
@@ -90,7 +91,8 @@ class LazyNetOptuna:
         lazy_net = None
         try:
             # 1. Выбор из заданных списков
-            model_name = trial.suggest_categorical('model', self.models_space)
+            model_name = trial.suggest_categorical('model_name', self.models_names_space)
+            model = trial.suggest_categorical('model', self.models_space)
             loss_name = trial.suggest_categorical('loss', self.losses_space)
             batch_size = trial.suggest_categorical('batch_size', self.batch_sizes)
 
@@ -114,6 +116,7 @@ class LazyNetOptuna:
 
             lazy_net = LazyNet(
                 model_name=model_name,
+                model=model,
                 loss_name=loss_name,
                 train_img_dirs=self.train_img_dirs,
                 train_mask_dirs=self.train_mask_dirs,
