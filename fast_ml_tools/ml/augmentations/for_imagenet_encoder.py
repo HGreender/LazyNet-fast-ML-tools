@@ -9,18 +9,19 @@ IMAGENET_STD = [0.229, 0.224, 0.225]
 def get_manga_panel_bubble_augmentation(phase='train', size=(512, 512)):
     """
     Аугментации для сегментации панелей и пузырей в манге.
-    Фокус на геометрии форм и устойчивости к качеству скана.
+    Автоматически конвертирует цветные изображения в Grayscale.
     """
     MEAN_GRAY = 0.485 
     STD_GRAY = 0.229
     
     if phase == 'train':
         return A.Compose([
+            A.ToGray(num_output_channels=1, p=1.0),
             A.HorizontalFlip(p=0.5),
             A.Affine(
                 translate_percent=0.05,
                 scale=(0.8, 1.2),
-                rotate=(-10, 10), # Небольшой перекос реалистичен для сканов
+                rotate=(-10, 10),
                 border_mode=cv2.BORDER_CONSTANT,
                 cval=0, # Заполняем чёрным (фон манги)
                 p=0.7
@@ -39,6 +40,7 @@ def get_manga_panel_bubble_augmentation(phase='train', size=(512, 512)):
         ])
     else:
         return A.Compose([
+            A.ToGray(num_output_channels=1, p=1.0),
             A.Resize(size[0], size[1]),
             A.Normalize(mean=[MEAN_GRAY], std=[STD_GRAY]),
             ToTensorV2(),
