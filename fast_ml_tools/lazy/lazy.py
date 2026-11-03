@@ -4,6 +4,7 @@ from tqdm import tqdm
 import cv2
 import torch
 import numpy as np
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from concurrent.futures import ThreadPoolExecutor
 
@@ -53,6 +54,7 @@ class LazyNet:
             model_path: str = None,
             model=None,
             loss_name: str = None,
+            loss_class: type[nn.Module] | None = None,
             augmentation_fn: callable = get_imagenet_encoder_augmentation,
             train_img_dirs: list[str] = None,
             train_mask_dirs: list[str] = None,
@@ -197,6 +199,7 @@ class LazyNet:
                 lr_patience=lr_patience,
                 lr_factor=lr_factor,
                 loss_name=loss_name,
+                loss_class=loss_class,
                 early_stopping_threshold=early_stopping_threshold,
                 metric_names=metric_names
             )
@@ -210,6 +213,7 @@ class LazyNet:
             lr_patience: int,
             lr_factor: float,
             loss_name: str,
+            loss_class: type[nn.Module] | None,
             early_stopping_threshold: int,
             metric_names: list = None
     ):
@@ -220,9 +224,14 @@ class LazyNet:
             weight_decay=weight_decay
         )
 
-        if loss_name not in LOSS_FACTORIES:
-            raise ValueError(f"Неизвестная функция ошибки: {loss_name}. Доступны: {self.available_losses}")
-        self.loss_fn = LOSS_FACTORIES[loss_name]()
+        if loss_class is not None:
+            self.loss_fn = loss_class()
+        elif loss_name is not None:
+            if loss_name not in LOSS_FACTORIES:
+                raise ValueError(f"Указан неверный loss_name: {loss_name}. Доступны: {self.available_losses}")
+            self.loss_fn = LOSS_FACTORIES[loss_name]()
+        else:
+            raise ValueError("Необходимо указать либо loss_name, либо loss_class")
 
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
