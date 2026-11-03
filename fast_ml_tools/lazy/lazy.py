@@ -21,7 +21,8 @@ from fast_ml_tools.ml.models import (efficientnetb4_unet,
 from fast_ml_tools.ml.losses import (DiceBCELoss,
                                      FocalLoss,
                                      DiceFocalLoss,
-                                     IoUFocalLoss)
+                                     IoUFocalLoss,
+                                     LovaszBCELoss)
 from fast_ml_tools.ml.datasets import (create_train_val_datasets_from_multiple_dirs,
                                        InferenceDataset,
                                        MultiDirsDataset,
@@ -37,6 +38,7 @@ LOSS_FACTORIES = {
     'dice_bce': DiceBCELoss,
     'dice_focal': DiceFocalLoss,
     'iou_focal': IoUFocalLoss,
+    'lovasz_bce': LovaszBCELoss,
 }
 
 
