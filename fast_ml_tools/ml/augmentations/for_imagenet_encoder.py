@@ -6,6 +6,38 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
+def get_grayscale_imagenet_augmentation(phase='train', size=(512, 512)):
+    """Аугментации для 1-канальных (Grayscale) медицинских снимков"""
+    # Используем mean/std только для первого канала ImageNet или средние значения
+    MEAN_GRAY = 0.485 
+    STD_GRAY = 0.229
+    
+    if phase == 'train':
+        return A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.Affine(
+                translate_percent=0.05,
+                scale=(0.9, 1.1),
+                rotate=(-15, 15),
+                border_mode=cv2.BORDER_CONSTANT,
+                p=0.5
+            ),
+            A.Resize(size[0], size[1]),
+            A.OneOf([
+                A.GaussNoise(std_range=(0.02, 0.1)),
+                A.GaussianBlur(blur_limit=(3, 5)),
+            ], p=0.2),
+            A.Normalize(mean=[MEAN_GRAY], std=[STD_GRAY]), # <-- ВАЖНО: списки из 1 элемента
+            ToTensorV2(),
+        ])
+    else:
+        return A.Compose([
+            A.Resize(size[0], size[1]),
+            A.Normalize(mean=[MEAN_GRAY], std=[STD_GRAY]), # <-- ВАЖНО: списки из 1 элемента
+            ToTensorV2(),
+        ])
+
+
 def get_imagenet_encoder_augmentation(
         phase='train',
         size=(512, 512)

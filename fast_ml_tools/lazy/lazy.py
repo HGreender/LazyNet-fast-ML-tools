@@ -259,7 +259,8 @@ class LazyNet:
         if not os.path.exists(path):
             raise FileNotFoundError(f"Файл модели не найден: {path}")
 
-        state_dict = torch.load(path, map_location=self.device)
+        # state_dict = torch.load(path, map_location=self.device)
+        state_dict = torch.load(path, map_location=self.device, weights_only=False)
         self.model.load_state_dict(state_dict)
         self.model.to(self.device)
         print(f'Веса загружены из {path}')
@@ -427,6 +428,14 @@ class LazyNet:
             raise RuntimeError("Модель не инициализирована. Невозможно выполнить предсказание.")
 
         self.model.eval()
+
+        if hasattr(self.model, 'encoder') and hasattr(self.model.encoder, '_conv_stem'):
+            in_channels = self.model.encoder._conv_stem.in_channels
+            if in_channels == 1 and image_rgb.ndim == 3 and image_rgb.shape[-1] == 3:
+                import cv2
+                image_rgb = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
+                if image_rgb.ndim == 2:
+                    image_rgb = np.expand_dims(image_rgb, axis=-1) 
 
         # Препроцессинг изображения
         input_tensor, original_size = preprocess_image_array_for_model(
