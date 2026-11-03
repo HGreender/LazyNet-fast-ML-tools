@@ -34,7 +34,8 @@ class LazyNetOptuna:
             positive_weight: float = 1.0,
 
             # --- Пространства поиска гиперпараметров (Search Spaces) ---
-            models_space: list = MODEL_FACTORIES,
+            models_space: list = [None],
+            models_names_space: list = MODEL_FACTORIES,
             losses_space: list = LOSS_FACTORIES,
             lr_range: tuple = (5e-6, 5e-4),  # (min, max)
             wd_range: tuple = (1e-6, 1e-4),  # (min, max)
@@ -71,8 +72,8 @@ class LazyNetOptuna:
         self.positive_weight_range = positive_weight_range
 
         # Сохраняем пространства поиска
-        self.models_names_space = models_space
         self.models_space = models_space
+        self.models_names_space = models_names_space
         self.losses_space = losses_space
         self.lr_range = lr_range
         self.wd_range = wd_range

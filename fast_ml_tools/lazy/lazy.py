@@ -18,7 +18,9 @@ from fast_ml_tools.ml.utils import (preprocess_image_array_for_model,
                                     postprocess_prediction,
                                     get_device)
 from fast_ml_tools.ml.models import (efficientnetb4_unet,
-                                     efficientnetb4_unetpp)
+                                     efficientnetb4_unet_1_channel,
+                                     efficientnetb4_unetpp,
+                                     efficientnetb4_unetpp_1_channel)
 from fast_ml_tools.ml.losses import (DiceBCELoss,
                                      FocalLoss,
                                      DiceFocalLoss,
@@ -31,7 +33,9 @@ from fast_ml_tools.ml.datasets import (create_train_val_datasets_from_multiple_d
 
 MODEL_FACTORIES = {
     'efficientnetb4_unet': efficientnetb4_unet,
+    'efficientnetb4_unet_1ch': efficientnetb4_unet_1_channel,
     'efficientnetb4_unet++': efficientnetb4_unetpp,
+    'efficientnetb4_unet++_1ch': efficientnetb4_unetpp_1_channel,
 }
 
 LOSS_FACTORIES = {
