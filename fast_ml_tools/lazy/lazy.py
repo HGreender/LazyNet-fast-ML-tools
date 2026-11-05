@@ -47,6 +47,10 @@ LOSS_FACTORIES = {
 }
 
 
+def identity_collate(my_batch):
+    return my_batch
+
+
 class LazyNet:
     ''' Класс для быстрого обучения моделей бинарной сегментации и инференса.
     Работает со списками папок с изображениями и масками.
@@ -587,9 +591,6 @@ class LazyNet:
         concat_dir = os.path.join(output_dir, 'concat') if save_concat else None
         if masks_dir: os.makedirs(masks_dir, exist_ok=True)
         if concat_dir: os.makedirs(concat_dir, exist_ok=True)
-
-        def identity_collate(my_batch):
-            return my_batch
 
         inf_dataset = InferenceDataset(all_files)
         inf_loader = DataLoader(
