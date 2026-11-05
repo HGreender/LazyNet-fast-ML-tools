@@ -588,11 +588,14 @@ class LazyNet:
         if masks_dir: os.makedirs(masks_dir, exist_ok=True)
         if concat_dir: os.makedirs(concat_dir, exist_ok=True)
 
+        def identity_collate(my_batch):
+            return my_batch
+
         inf_dataset = InferenceDataset(all_files)
         inf_loader = DataLoader(
             inf_dataset, batch_size=batch_size, shuffle=False,
             num_workers=num_workers, pin_memory=False,
-            collate_fn=lambda x: x
+            collate_fn=identity_collate
         )
 
         print(f"Обработка {len(all_files)} изображений (batch={batch_size}, save_workers={save_workers})...")
