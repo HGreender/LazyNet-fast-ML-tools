@@ -161,7 +161,7 @@ class LazyNetOptuna:
 
     def run(
             self,
-            study_name: str = 'lazynet_seg',
+            study_name: str | None = None,
             direction: str = 'minimize',
             n_warmup_steps: int = 5,
             n_trials: int | None = None,
