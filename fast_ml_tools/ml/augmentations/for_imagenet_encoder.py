@@ -33,7 +33,7 @@ def get_manga_panel_bubble_augmentation(phase='train', size=(512, 512)):
                 # Усиление локальных контрастов (помогает выделить бледные линии панелей)
                 A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
                 # Имитация "грязной" бумаги или шума сканера
-                A.GaussNoise(std_range=(5.0, 15.0), p=0.3),
+                A.GaussNoise(std_range=(0.02, 0.1), p=0.3),
             ], p=0.8),
             A.Resize(size[0], size[1]),
             A.Normalize(mean=[MEAN_GRAY], std=[STD_GRAY]),
