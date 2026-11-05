@@ -23,7 +23,8 @@ def get_manga_panel_bubble_augmentation(phase='train', size=(512, 512)):
                 scale=(0.8, 1.2),
                 rotate=(-10, 10),
                 border_mode=cv2.BORDER_CONSTANT,
-                cval=0, # Заполняем чёрным (фон манги)
+                fill=255, # Заполняем белым (фон манги)
+                fill_mask=0, # Заполняем чёрным (фон маски)
                 p=0.7
             ),
             A.OneOf([
@@ -32,7 +33,7 @@ def get_manga_panel_bubble_augmentation(phase='train', size=(512, 512)):
                 # Усиление локальных контрастов (помогает выделить бледные линии панелей)
                 A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
                 # Имитация "грязной" бумаги или шума сканера
-                A.GaussNoise(var_limit=(5.0, 15.0), p=0.3),
+                A.GaussNoise(std_range=(5.0, 15.0), p=0.3),
             ], p=0.8),
             A.Resize(size[0], size[1]),
             A.Normalize(mean=[MEAN_GRAY], std=[STD_GRAY]),
