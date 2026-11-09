@@ -54,7 +54,7 @@ def efficientnetb4_unet_1_channel(classes: list = ['target_class'], activation: 
     """
     return efficientnetb4_unet_base(
         classes=len(classes),
-        in_channels=3,
+        in_channels=1,
         activation=activation,
     )
 
@@ -63,7 +63,7 @@ def efficientnetb4_unetpp(classes: list = ['target_class'], activation: str | No
     Создание UNet++ с EfficientNet-B4
     decoder_channels: каналы в декодере. Для B4 обычно используют уменьшенные каналы для экономии памяти.
     """
-    return efficientnetb4_unet_base(
+    return efficientnetb4_unetpp_base(
         classes=len(classes),
         in_channels=3,
         activation=activation,
@@ -75,7 +75,7 @@ def efficientnetb4_unetpp_1_channel(classes: list = ['target_class'], activation
     Создание UNet++ с EfficientNet-B4
     decoder_channels: каналы в декодере. Для B4 обычно используют уменьшенные каналы для экономии памяти.
     """
-    return efficientnetb4_unet_base(
+    return efficientnetb4_unetpp_base(
         classes=len(classes),
         in_channels=1,
         activation=activation,
