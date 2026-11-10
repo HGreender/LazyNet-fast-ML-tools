@@ -562,11 +562,13 @@ class LazyNet:
             threshold: float = 0.5,
             save_masks: bool = True,
             save_concat: bool = True,
+            save_overlay: bool = True,
             batch_size: int = 50,
             num_workers: int = 2,
             save_workers: int = 4,
             mask_suffix: str = '_mask',
             viz_suffix: str = '_viz',
+            overlay_suffix: str = '_overlay',
             overlay_color: tuple[int] = (0, 255, 0),
             overlay_strength: float = 0.5,
     ):
@@ -589,8 +591,10 @@ class LazyNet:
 
         masks_dir = os.path.join(output_dir, 'masks') if save_masks else None
         concat_dir = os.path.join(output_dir, 'concat') if save_concat else None
+        overlays_dir = os.path.join(output_dir, 'overlays') if save_overlay else None
         if masks_dir: os.makedirs(masks_dir, exist_ok=True)
         if concat_dir: os.makedirs(concat_dir, exist_ok=True)
+        if overlays_dir: os.makedirs(overlays_dir, exist_ok=True)
 
         inf_dataset = InferenceDataset(all_files)
         inf_loader = DataLoader(
@@ -642,35 +646,50 @@ class LazyNet:
                         if save_masks and masks_dir:
                             cv2.imwrite(os.path.join(masks_dir, f"{n}{mask_suffix}.png"), binary * 255)
 
-                        # 2. Сохранение тройного конката (Оригинал + Маска + Оверлей)
-                        if save_concat and concat_dir:
+                        # 2. Оверлей (маска, наложенная на изображение) — нужен
+                        #    и для отдельной папки overlays, и для конката
+                        overlay_img = None
+                        if (save_overlay and overlays_dir) or (save_concat and concat_dir):
                             try:
-                                # Создаем оверлей
                                 overlay_img = create_overlay_cv2(
-                                    img_rgb, 
-                                    binary, 
-                                    color=overlay_color, 
+                                    img_rgb,
+                                    binary,
+                                    color=overlay_color,
                                     alpha=overlay_strength
                                 )
-                                
+                                h, w = img_rgb.shape[:2]
+                                if overlay_img.shape[:2] != (h, w):
+                                    overlay_img = cv2.resize(overlay_img, (w, h))
+                            except Exception as ex:
+                                print(f"Ошибка создания оверлея {n}: {ex}")
+
+                        # 3. Сохранение оверлея отдельным файлом
+                        if save_overlay and overlays_dir and overlay_img is not None:
+                            try:
+                                save_path = os.path.join(overlays_dir, f"{n}{overlay_suffix}{e}")
+                                cv2.imwrite(save_path, cv2.cvtColor(overlay_img, cv2.COLOR_RGB2BGR))
+                            except Exception as ex:
+                                print(f"Ошибка сохранения оверлея {n}: {ex}")
+
+                        # 4. Сохранение тройного конката (Оригинал + Маска + Оверлей)
+                        if save_concat and concat_dir and overlay_img is not None:
+                            try:
                                 # Создаем визуализацию маски (3 канала, чтобы можно было склеить с RGB)
                                 # binary имеет форму (H, W), превращаем в (H, W, 3)
                                 mask_viz = np.stack([binary * 255] * 3, axis=-1)
 
                                 # Убеждаемся, что все части одного размера
                                 h, w = img_rgb.shape[:2]
-                                if overlay_img.shape[:2] != (h, w):
-                                    overlay_img = cv2.resize(overlay_img, (w, h))
                                 if mask_viz.shape[:2] != (h, w):
                                     mask_viz = cv2.resize(mask_viz, (w, h))
 
                                 # Горизонтальная склейка: [Оригинал | Маска | Оверлей]
                                 concat_result = np.hstack([img_rgb, mask_viz, overlay_img])
-                                
+
                                 # Сохраняем (конвертируем RGB -> BGR для OpenCV)
                                 save_path = os.path.join(concat_dir, f"{n}{viz_suffix}{e}")
                                 cv2.imwrite(save_path, cv2.cvtColor(concat_result, cv2.COLOR_RGB2BGR))
-                                
+
                             except Exception as ex:
                                 print(f"Ошибка сохранения конката {n}: {ex}")
 
