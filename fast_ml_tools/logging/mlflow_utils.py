@@ -7,7 +7,7 @@ class MLflowManager:
         self.MLFLOW_TRACKING_URI = 'http://192.168.0.65:5000'
         self.MLFLOW_S3_ENDPOINT_URL = 'http://192.168.0.65:5001'  # Адрес MinIO API
         self.AWS_ACCESS_KEY_ID = 'minioadmin'
-        self.AWS_SECRET_ACCESS_KEY = 'Gjkeghbynth2025m'
+        self.AWS_SECRET_ACCESS_KEY = ''
         self.AWS_DEFAULT_REGION = 'us-east-1'
 
     def quick_init(self, experiment_name: str):
