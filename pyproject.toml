@@ -29,6 +29,10 @@ dependencies = [
     "optuna>=3.6.0",
 ]
 
+# Консольная команда для smoke-проверки установки (fast_ml_tools/check.py)
+[project.scripts]
+fast-ml-check = "fast_ml_tools.check:main"
+
 [tool.hatch.version]
 path = "fast_ml_tools/_version.py"
 
@@ -39,6 +43,12 @@ logging = [
     "mlflow>=3.0.0",
     "boto3>=1.35.0",
     "sqlalchemy>=2.0.0",
+]
+
+# Для разработки и тестов (tests/test_installation.py)
+dev = [
+    "loguru>=0.7.0",
+    "pytest>=8.0.0",
 ]
 
 # Полный набор
